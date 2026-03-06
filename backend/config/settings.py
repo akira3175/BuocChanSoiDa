@@ -35,6 +35,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'cloudinary_storage',
+    'cloudinary',
     
     # Local apps
     'core.apps.CoreConfig',
@@ -164,3 +166,22 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+
+# Cloudinary configuration
+CLOUDINARY_URL = os.getenv('CLOUDINARY_URL', '')
+
+if CLOUDINARY_URL:
+    import re
+    match = re.match(
+        r'cloudinary://(?P<key>[^:]+):(?P<secret>[^@]+)@(?P<cloud>.+)',
+        CLOUDINARY_URL,
+    )
+    if match:
+        CLOUDINARY_STORAGE = {
+            'CLOUD_NAME': match.group('cloud'),
+            'API_KEY': match.group('key'),
+            'API_SECRET': match.group('secret'),
+        }
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
