@@ -1,0 +1,114 @@
+{
+    "common": {
+        "loading": "Loading...",
+        "retry": "Retry",
+        "save": "Save settings",
+        "saved": "✓ Saved!",
+        "cancel": "Cancel",
+        "close": "Close",
+        "viewAll": "View all",
+        "minutes": "min",
+        "points": "stops",
+        "locations": "locations",
+        "version": "Version"
+    },
+    "splash": {
+        "initDevice": "Initializing device...",
+        "checkConnection": "Checking connection...",
+        "requestLocation": "Requesting location access...",
+        "requestNotification": "Requesting notification access...",
+        "ready": "Ready to explore!",
+        "noNetwork": "No internet connection and offline data not downloaded.",
+        "appTitle": "Food Street",
+        "appSubtitle": "Vĩnh Khánh - Saigon"
+    },
+    "nav": {
+        "map": "Map",
+        "tours": "Tours",
+        "offline": "Offline",
+        "me": "Me"
+    },
+    "map": {
+        "status": "Status",
+        "recording": "Recording location...",
+        "gpsDenied": "GPS denied",
+        "waitingGps": "Waiting for GPS...",
+        "searchPlaceholder": "Search food, landmarks on Vĩnh Khánh street...",
+        "listenNarration": "Listen narration",
+        "offlineMode": "Offline Mode"
+    },
+    "tour": {
+        "title": "Guided Tour",
+        "tabOverview": "Overview",
+        "tabRoute": "Route",
+        "tabReviews": "Reviews",
+        "exploreTours": "Explore Tours",
+        "routeDetail": "Route Details",
+        "nextStop": "Next stop",
+        "distanceWalk": "~{{distance}}m away • {{time}} min walk",
+        "getDirections": "Directions",
+        "startTour": "Start Tour",
+        "endTour": "End Tour",
+        "viewOnMap": "View on Map",
+        "offRoute": "You are off route! Please return to the trail.",
+        "noReviews": "No reviews yet",
+        "beFirstReview": "Be the first to review this tour!",
+        "categoryFood": "🍜 Food",
+        "categoryHistorical": "🏛️ Heritage",
+        "defaultDescription": "A unique food spot on Vĩnh Khánh street."
+    },
+    "offline": {
+        "title": "Download Offline Data",
+        "bannerTitle": "Explore without internet",
+        "bannerDescription": "Download area packs on WiFi to use GPS narration even without 4G.",
+        "readyStatus": "Ready to use offline",
+        "sectionTitle": "Area Packages",
+        "download": "Download",
+        "delete": "Delete",
+        "downloaded": "Downloaded",
+        "downloading": "Downloading...",
+        "syncPending": "{{count}} logs pending sync",
+        "syncing": "Syncing data..."
+    },
+    "settings": {
+        "title": "Settings",
+        "tourist": "Tourist",
+        "language": "Language",
+        "voiceRegion": "Voice Region",
+        "voiceSouth": "Southern voice",
+        "voiceSouthDesc": "Natural Southern Vietnamese accent",
+        "voiceNorth": "Northern voice",
+        "voiceNorthDesc": "Traditional Northern Vietnamese accent",
+        "voiceCentral": "Central voice",
+        "voiceCentralDesc": "Central Vietnamese accent",
+        "appInfo": "App Information",
+        "appName": "Vĩnh Khánh Food Street"
+    },
+    "narration": {
+        "narrationPoint": "Narration point",
+        "stopAndMark": "Stop & Mark",
+        "nearbyFood": "Nearby food suggestions"
+    },
+    "qr": {
+        "codeReceived": "Code received!",
+        "scanTitle": "Scan QR code at destination",
+        "scanDescription": "Place the QR code in the center of the frame to auto-play narration",
+        "demoScan": "Demo: Test Scan",
+        "gallery": "Gallery",
+        "flashOn": "Flash off",
+        "flashOff": "Flash on"
+    },
+    "partner": {
+        "viewMenu": "View menu"
+    },
+    "review": {
+        "writeReview": "Write a Review",
+        "yourRating": "How was your experience?",
+        "commentPlaceholder": "Share more about your experience (optional)...",
+        "submit": "Submit Review",
+        "reviewCount": "Reviews",
+        "anonymous": "Tourist",
+        "errorNoRating": "Please select a star rating.",
+        "errorSubmit": "An error occurred, please try again."
+    }
+}

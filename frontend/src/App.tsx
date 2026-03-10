@@ -1,35 +1,48 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { AppProvider } from './context/AppContext';
+import PageTransition from './components/PageTransition';
+import SplashScreen from './pages/SplashScreen';
+import './index.css';
 
-function App() {
-  const [count, setCount] = useState(0)
+// Lazy load các pages (code-splitting)
+const MapExplore = lazy(() => import('./pages/MapExplore'));
+const GuidedTour = lazy(() => import('./pages/GuidedTour'));
+const OfflineDownload = lazy(() => import('./pages/OfflineDownload'));
+const Settings = lazy(() => import('./pages/Settings'));
 
+function LazyFallback() {
+  const { t } = useTranslation();
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="flex h-dvh w-full items-center justify-center bg-background-light">
+      <div className="flex flex-col items-center gap-3 animate-fade-in">
+        <div className="size-12 rounded-full border-[3px] border-primary border-t-transparent animate-spin" />
+        <p className="text-xs text-slate-400 font-medium">{t('common.loading')}</p>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default function App() {
+  return (
+    <AppProvider>
+      <BrowserRouter>
+        <div className="min-h-dvh bg-background-light">
+          <Suspense fallback={<LazyFallback />}>
+            <PageTransition>
+              <Routes>
+                <Route path="/" element={<SplashScreen />} />
+                <Route path="/map" element={<MapExplore />} />
+                <Route path="/tours" element={<GuidedTour />} />
+                <Route path="/offline" element={<OfflineDownload />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </PageTransition>
+          </Suspense>
+        </div>
+      </BrowserRouter>
+    </AppProvider>
+  );
+}

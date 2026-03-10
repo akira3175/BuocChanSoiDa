@@ -1,0 +1,114 @@
+{
+    "common": {
+        "loading": "読み込み中...",
+        "retry": "再試行",
+        "save": "設定を保存",
+        "saved": "✓ 保存しました！",
+        "cancel": "キャンセル",
+        "close": "閉じる",
+        "viewAll": "すべて見る",
+        "minutes": "分",
+        "points": "スポット",
+        "locations": "地点",
+        "version": "バージョン"
+    },
+    "splash": {
+        "initDevice": "デバイスを初期化中...",
+        "checkConnection": "接続を確認中...",
+        "requestLocation": "位置情報の許可をリクエスト中...",
+        "requestNotification": "通知の許可をリクエスト中...",
+        "ready": "探索の準備完了！",
+        "noNetwork": "ネットワーク接続がなく、オフラインデータもダウンロードされていません。",
+        "appTitle": "グルメストリート",
+        "appSubtitle": "ヴィンカン - サイゴン"
+    },
+    "nav": {
+        "map": "地図",
+        "tours": "ツアー",
+        "offline": "オフライン",
+        "me": "マイ"
+    },
+    "map": {
+        "status": "ステータス",
+        "recording": "位置情報を記録中...",
+        "gpsDenied": "GPS拒否",
+        "waitingGps": "GPS待機中...",
+        "searchPlaceholder": "ヴィンカン通りのグルメ・史跡を検索...",
+        "listenNarration": "ナレーションを聴く",
+        "offlineMode": "オフラインモード"
+    },
+    "tour": {
+        "title": "ガイドツアー",
+        "tabOverview": "概要",
+        "tabRoute": "ルート",
+        "tabReviews": "レビュー",
+        "exploreTours": "ツアーを探す",
+        "routeDetail": "ルート詳細",
+        "nextStop": "次のスポット",
+        "distanceWalk": "約{{distance}}m先 • 徒歩{{time}}分",
+        "getDirections": "道案内",
+        "startTour": "ツアー開始",
+        "endTour": "ツアー終了",
+        "viewOnMap": "地図で表示",
+        "offRoute": "ルートから外れています！元の道に戻ってください。",
+        "noReviews": "レビューはまだありません",
+        "beFirstReview": "最初のレビューを書きましょう！",
+        "categoryFood": "🍜 グルメ",
+        "categoryHistorical": "🏛️ 史跡",
+        "defaultDescription": "ヴィンカン通りの特別なグルメスポット。"
+    },
+    "offline": {
+        "title": "オフラインデータをダウンロード",
+        "bannerTitle": "ネットなしで探索",
+        "bannerDescription": "WiFi接続時にエリアパックをダウンロードすると、4Gがなくてもgpsナレーションが使えます。",
+        "readyStatus": "オフライン使用準備完了",
+        "sectionTitle": "エリアパック",
+        "download": "ダウンロード",
+        "delete": "削除",
+        "downloaded": "ダウンロード済",
+        "downloading": "ダウンロード中...",
+        "syncPending": "{{count}} 件のログが同期待ち",
+        "syncing": "データ同期中..."
+    },
+    "settings": {
+        "title": "設定",
+        "tourist": "観光客",
+        "language": "言語",
+        "voiceRegion": "音声地域",
+        "voiceSouth": "南部アクセント",
+        "voiceSouthDesc": "自然な南ベトナムアクセント",
+        "voiceNorth": "北部アクセント",
+        "voiceNorthDesc": "伝統的な北ベトナムアクセント",
+        "voiceCentral": "中部アクセント",
+        "voiceCentralDesc": "中部ベトナムアクセント",
+        "appInfo": "アプリ情報",
+        "appName": "ヴィンカンフードストリート"
+    },
+    "narration": {
+        "narrationPoint": "ナレーションポイント",
+        "stopAndMark": "停止してマーク",
+        "nearbyFood": "近くのおすすめグルメ"
+    },
+    "qr": {
+        "codeReceived": "コードを認識しました！",
+        "scanTitle": "目的地でQRコードをスキャン",
+        "scanDescription": "QRコードをフレームの中央に置くと自動でナレーションが再生されます",
+        "demoScan": "デモ：テストスキャン",
+        "gallery": "ギャラリー",
+        "flashOn": "フラッシュオフ",
+        "flashOff": "フラッシュオン"
+    },
+    "partner": {
+        "viewMenu": "メニューを見る"
+    },
+    "review": {
+        "writeReview": "レビューを書く",
+        "yourRating": "体験はいかがでしたか？",
+        "commentPlaceholder": "体験についてもっとシェアしてください（任意）...",
+        "submit": "送信する",
+        "reviewCount": "レビュー",
+        "anonymous": "観光客",
+        "errorNoRating": "星の評価を選択してください。",
+        "errorSubmit": "エラーが発生しました。もう一度お試しください。"
+    }
+}
