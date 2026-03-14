@@ -8,6 +8,7 @@ from users.permissions import IsAdminOrReadOnly
 
 from .models import Media, POI, Partner
 from .serializers import (
+    MediaCRUDSerializer,
     MediaSerializer,
     POIDetailSerializer,
     POIListSerializer,
@@ -126,7 +127,6 @@ class POIMediaView(generics.ListAPIView):
         if voice_region:
             qs = qs.filter(voice_region=voice_region)
         return qs
-
 
 class POIPartnersView(generics.ListAPIView):
     """

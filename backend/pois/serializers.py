@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import POI, Media, Partner
+from .models import Media, POI, Partner
 
 
 class MediaSerializer(serializers.ModelSerializer):
@@ -10,6 +10,20 @@ class MediaSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'language', 'voice_region',
             'file_url', 'media_type', 'media_type_display',
+        ]
+
+
+class MediaCRUDSerializer(serializers.ModelSerializer):
+    media_type_display = serializers.CharField(source='get_media_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = Media
+        fields = [
+            'id', 'poi',
+            'language', 'voice_region',
+            'file_url', 'media_type', 'media_type_display',
+            'status', 'status_display',
         ]
 
 
