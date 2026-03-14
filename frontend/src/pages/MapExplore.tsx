@@ -78,7 +78,7 @@ export default function MapExplore() {
     const [narrationData, setNarrationData] = useState<{ poi: POI; media: Media | null; partners: Partner[] } | null>(null);
     const [isRecenterRequested, setIsRecenterRequested] = useState(false);
 
-    const { position, permissionStatus } = useGeolocation(user?.id);
+    const { position, permissionStatus } = useGeolocation();
 
     // Fetch POIs khi có vị trí
     useEffect(() => {
@@ -103,7 +103,6 @@ export default function MapExplore() {
     const { triggerNarration, finishNarration } = useNarrationEngine({
         language: user?.preferred_language || 'vi',
         voiceRegion: user?.preferred_voice_region || 'mien_nam',
-        userId: user?.id,
         onNarrationReady: handleNarrationReady,
         onNarrationConflict: handleNarrationConflict,
     });
@@ -113,12 +112,12 @@ export default function MapExplore() {
         pois,
         position: position || null,
         onEnter: (poi) => {
-            triggerNarration(poi, 'Auto');
+            triggerNarration(poi, 'AUTO');
         },
     });
 
     const handlePOIMarkerClick = useCallback((poi: POI) => {
-        triggerNarration(poi, 'Auto');
+        triggerNarration(poi, 'AUTO');
     }, [triggerNarration]);
 
     const handleQRSuccess = useCallback((poi: POI) => {

@@ -31,15 +31,13 @@ function saveLocalLog(log: NarrationLogLocal) {
 interface UseNarrationEngineOptions {
     language: Language;
     voiceRegion: VoiceRegion;
-    userId?: string;
     onNarrationReady: (poi: POI, media: Media | null, partners: Partner[]) => void;
-    onNarrationConflict: (newPoi: POI) => void; // Hỏi user có muốn nghe bài mới không
+    onNarrationConflict: (newPoi: POI) => void;
 }
 
 export function useNarrationEngine({
     language,
     voiceRegion,
-    userId: _userId,
     onNarrationReady,
     onNarrationConflict,
 }: UseNarrationEngineOptions) {

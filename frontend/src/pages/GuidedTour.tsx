@@ -137,7 +137,7 @@ export default function GuidedTour() {
     const [showReviewForm, setShowReviewForm] = useState(false);
     const [narrationData, setNarrationData] = useState<{ poi: POI; media: Media | null; partners: Partner[] } | null>(null);
 
-    const { position } = useGeolocation(user?.id);
+    const { position } = useGeolocation();
     const { reviews, stats, addReview } = useTourReviews(selectedTour?.id || '');
 
     const TABS = [
@@ -182,7 +182,6 @@ export default function GuidedTour() {
     const { triggerNarration, finishNarration } = useNarrationEngine({
         language: user?.preferred_language || 'vi',
         voiceRegion: user?.preferred_voice_region || 'mien_nam',
-        userId: user?.id,
         onNarrationReady: handleNarrationReady,
         onNarrationConflict: handleNarrationConflict,
     });
@@ -192,7 +191,7 @@ export default function GuidedTour() {
         pois: tourStarted ? poisForGeofence : [],
         position: position || null,
         onEnter: (poi) => {
-            triggerNarration(poi, 'Auto');
+            triggerNarration(poi, 'AUTO');
             // Tự động advance currentPOIIndex
             const idx = orderedPOIs.findIndex(tp => tp.poi.id === poi.id);
             if (idx >= 0 && idx >= currentPOIIndex) {
