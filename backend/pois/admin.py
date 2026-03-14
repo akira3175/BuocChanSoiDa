@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django import forms
-import mapwidgets
+# import mapwidgets
 from .models import POI, Media, Partner
 
 
@@ -46,15 +46,6 @@ class POIAdmin(admin.ModelAdmin):
     search_fields = ['name', 'description', 'qr_code_data']
     ordering = ['name']
     inlines = [MediaInline, PartnerInline]
-
-    # Dùng mapwidgets cho 2 field tọa độ: hiển thị bản đồ kéo thả ngay trong admin
-    formfield_overrides = {
-        POI._meta.get_field('latitude').__class__: {},  # sẽ bị override bởi form
-    }
-
-    class Media:
-        css = {'all': ('mapwidgets/css/mapwidgets.css',)}
-        js = ('mapwidgets/js/mapwidgets.js',)
 
     fieldsets = (
         ('Thông tin cơ bản', {

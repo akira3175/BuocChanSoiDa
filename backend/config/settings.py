@@ -37,7 +37,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'cloudinary_storage',
     'cloudinary',
-    'mapwidgets',
     
     # Local apps
     'core.apps.CoreConfig',
@@ -187,17 +186,4 @@ if CLOUDINARY_URL:
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
-# ---------------------------------------------------------------------------
-# Django Map Widgets — dùng OpenStreetMap (không cần Google API key)
-# ---------------------------------------------------------------------------
-MAP_WIDGETS = {
-    "GooglePointFieldWidget": (
-        ("zoom", 17),
-        ("mapCenterLocationName", "Ho Chi Minh City, Vietnam"),
-    ),
-    "GOOGLE_MAP_API_KEY": "",  # Để trống → dùng Mapbox tiles miễn phí
-}
-
-# mapwidgets dùng jQuery: cần đảm bảo django.forms được import đúng
-FORM_RENDERER = 'django.forms.renderers.DjangoTemplates'
 
