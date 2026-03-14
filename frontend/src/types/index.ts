@@ -17,34 +17,31 @@ export interface POI {
     id: string;
     name: string;
     description: string;
-    lat: number;
-    lng: number;
+    latitude: number;  // khớp với backend serializer
+    longitude: number; // khớp với backend serializer
     geofence_radius: number; // meters
     category: POICategory;
     qr_code_data: string;
+    status?: number;
+    distance?: number; // field inject từ near-me view (mét)
     image_url?: string;
     address?: string;
 }
 
 export interface Media {
     id: string;
-    poi_id: string;
     language: Language;
     voice_region: VoiceRegion;
     file_url: string;
-    duration_seconds?: number;
-    media_type: 'audio' | 'tts';
+    media_type: 'AUDIO' | 'TTS'; // uppercase, khớp với backend TextChoices
+    media_type_display?: string;
 }
 
 export interface Partner {
     id: string;
-    poi_id: string;
     business_name: string;
-    image_url?: string;
     menu_details?: { must_try?: string[]; price_range?: string };
     opening_hours?: string;
-    distance_meters?: number;
-    avg_price?: number;
 }
 
 export interface Tour {
