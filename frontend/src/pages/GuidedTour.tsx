@@ -93,9 +93,9 @@ const MOCK_TOURS: Tour[] = [
         description: 'Khám phá các hàng quán đêm sầm uất nhất phố Vĩnh Khánh.',
         status: 1, is_suggested: true, estimated_duration_min: 90,
         pois: [
-            { poi: { id: '1', name: 'Hẻm Bánh Tráng Nướng', description: 'Bánh tráng nướng giòn rụm với đầy đủ topping', lat: 10.755, lng: 106.7035, geofence_radius: 40, category: 'food', qr_code_data: 'BCSD-POI-001' }, sequence_order: 1 },
-            { poi: { id: '2', name: 'Quán Hải Sản Đêm', description: 'Ghẹ rang me, ốc hương xào, tôm nướng muối ớt', lat: 10.7558, lng: 106.7042, geofence_radius: 35, category: 'food', qr_code_data: 'BCSD-POI-002' }, sequence_order: 2 },
-            { poi: { id: '3', name: 'Góc Chè & Nước Ép', description: 'Chè truyền thống và nước ép nhiệt đới', lat: 10.7545, lng: 106.7028, geofence_radius: 30, category: 'food', qr_code_data: 'BCSD-POI-003' }, sequence_order: 3 },
+            { poi: { id: '1', name: 'Hẻm Bánh Tráng Nướng', description: 'Bánh tráng nướng giòn rụm với đầy đủ topping', latitude: 10.755, longitude: 106.7035, geofence_radius: 40, category: 'food', qr_code_data: 'BCSD-POI-001' }, sequence_order: 1 },
+            { poi: { id: '2', name: 'Quán Hải Sản Đêm', description: 'Ghẹ rang me, ốc hương xào, tôm nướng muối ớt', latitude: 10.7558, longitude: 106.7042, geofence_radius: 35, category: 'food', qr_code_data: 'BCSD-POI-002' }, sequence_order: 2 },
+            { poi: { id: '3', name: 'Góc Chè & Nước Ép', description: 'Chè truyền thống và nước ép nhiệt đới', latitude: 10.7545, longitude: 106.7028, geofence_radius: 30, category: 'food', qr_code_data: 'BCSD-POI-003' }, sequence_order: 3 },
         ],
     },
     {
@@ -103,7 +103,7 @@ const MOCK_TOURS: Tour[] = [
         description: 'Chùa cổ, gốc cây bồ đề và câu chuyện lịch sử khu dân cư lâu đời nhất Quận 4.',
         status: 1, is_suggested: true, estimated_duration_min: 60,
         pois: [
-            { poi: { id: '4', name: 'Chùa Vĩnh Khánh Cổ', description: 'Ngôi chùa 150 tuổi giữa phố ẩm thực', lat: 10.7565, lng: 106.705, geofence_radius: 50, category: 'historical', qr_code_data: 'BCSD-POI-004' }, sequence_order: 1 },
+            { poi: { id: '4', name: 'Chùa Vĩnh Khánh Cổ', description: 'Ngôi chùa 150 tuổi giữa phố ẩm thực', latitude: 10.7565, longitude: 106.705, geofence_radius: 50, category: 'historical', qr_code_data: 'BCSD-POI-004' }, sequence_order: 1 },
         ],
     },
     {
@@ -163,7 +163,7 @@ export default function GuidedTour() {
 
     // Tọa độ route line
     const routePoints = useMemo<[number, number][]>(() => {
-        return orderedPOIs.map(tp => [tp.poi.lat, tp.poi.lng]);
+        return orderedPOIs.map(tp => [tp.poi.latitude, tp.poi.longitude]);
     }, [orderedPOIs]);
 
     // POIs dạng flat array cho geofence
@@ -214,7 +214,7 @@ export default function GuidedTour() {
     const nextPOI: POI | undefined = orderedPOIs[currentPOIIndex]?.poi;
     const distanceToNext = useMemo(() => {
         if (!position || !nextPOI) return null;
-        return Math.round(haversineDistance(position.lat, position.lng, nextPOI.lat, nextPOI.lng));
+        return Math.round(haversineDistance(position.lat, position.lng, nextPOI.latitude, nextPOI.longitude));
     }, [position, nextPOI]);
 
     const walkTimeMin = distanceToNext ? Math.max(1, Math.round(distanceToNext / 80)) : null; // ~80m/phút tốc độ đi bộ
@@ -343,7 +343,7 @@ export default function GuidedTour() {
                     {showMap && orderedPOIs.length > 0 ? (
                         <div className="relative w-full h-64 rounded-2xl overflow-hidden mb-6 border border-slate-200/60 shadow-inner">
                             <MapContainer
-                                center={[orderedPOIs[0].poi.lat, orderedPOIs[0].poi.lng]}
+                                center={[orderedPOIs[0].poi.latitude, orderedPOIs[0].poi.longitude]}
                                 zoom={16}
                                 zoomControl={false}
                                 style={{ height: '100%', width: '100%' }}
@@ -372,7 +372,7 @@ export default function GuidedTour() {
                                     return (
                                         <Marker
                                             key={tp.poi.id}
-                                            position={[tp.poi.lat, tp.poi.lng]}
+                                            position={[tp.poi.latitude, tp.poi.longitude]}
                                             icon={createTourPOIIcon(index, status)}
                                         >
                                             <Popup>
@@ -387,7 +387,7 @@ export default function GuidedTour() {
                                 {orderedPOIs.map((tp) => (
                                     <Circle
                                         key={`gf-${tp.poi.id}`}
-                                        center={[tp.poi.lat, tp.poi.lng]}
+                                        center={[tp.poi.latitude, tp.poi.longitude]}
                                         radius={tp.poi.geofence_radius}
                                         pathOptions={{ color: '#ff6a00', fillColor: '#ff6a00', fillOpacity: 0.06, weight: 1, dashArray: '4 4' }}
                                     />
@@ -424,7 +424,7 @@ export default function GuidedTour() {
                     <div>
                         {orderedPOIs.map((tp, index) => {
                             const status = getPOIStatus(index, currentPOIIndex);
-                            const distToPOI = position ? Math.round(haversineDistance(position.lat, position.lng, tp.poi.lat, tp.poi.lng)) : null;
+                            const distToPOI = position ? Math.round(haversineDistance(position.lat, position.lng, tp.poi.latitude, tp.poi.longitude)) : null;
                             return (
                                 <div
                                     key={tp.poi.id}

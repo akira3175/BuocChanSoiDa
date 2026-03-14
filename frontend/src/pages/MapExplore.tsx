@@ -58,12 +58,12 @@ function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
     return null;
 }
 
-// Mock POI data cho phố Vĩnh Khánh, Quận 4, TP.HCM
+// MOCK POI data — phố Vĩnh Khánh, Quận 4, TP.HCM (fallback khi offline)
 const MOCK_POIS: POI[] = [
-    { id: '1', name: 'Hẻm Bánh Tráng Nướng', description: 'Hẻm nổi tiếng với bánh tráng nướng giòn rụm, được phủ đầy trứng cút, tôm khô và các loại topping. Một trong những món ăn đường phố đặc trưng của phố Vĩnh Khánh.', lat: 10.7550, lng: 106.7035, geofence_radius: 40, category: 'food', qr_code_data: 'BCSD-POI-001' },
-    { id: '2', name: 'Quán Hải Sản Đêm', description: 'Khu ẩm thực hải sản về đêm với các món ghẹ rang me, ốc hương xào, tôm nướng muối ớt được chế biến tươi ngon.', lat: 10.7558, lng: 106.7042, geofence_radius: 35, category: 'food', qr_code_data: 'BCSD-POI-002' },
-    { id: '3', name: 'Góc Chè & Nước Ép', description: 'Điểm dừng quen thuộc của dân địa phương với các loại chè truyền thống và nước ép trái cây nhiệt đới tươi mát.', lat: 10.7545, lng: 106.7028, geofence_radius: 30, category: 'food', qr_code_data: 'BCSD-POI-003' },
-    { id: '4', name: 'Chùa Vĩnh Khánh Cổ', description: 'Ngôi chùa cổ hơn 150 tuổi nằm giữa lòng phố ẩm thực, là nơi người dân địa phương đến cúng tế và cầu bình an.', lat: 10.7565, lng: 106.7050, geofence_radius: 50, category: 'historical', qr_code_data: 'BCSD-POI-004' },
+    { id: '1', name: 'Hẻm Bánh Tráng Nướng', description: 'Hẻm nổi tiếng với bánh tráng nướng giòn rụm, được phủ đầy trứng cút, tôm khô và các loại topping. Một trong những món ăn đường phố đặc trưng của phố Vĩnh Khánh.', latitude: 10.7550, longitude: 106.7035, geofence_radius: 40, category: 'food', qr_code_data: 'BCSD-POI-001' },
+    { id: '2', name: 'Quán Hải Sản Đêm', description: 'Khu ẩm thực hải sản về đêm với các món ghẹ rang me, ốc hương xào, tôm nướng muối ớt được chế biến tươi ngon.', latitude: 10.7558, longitude: 106.7042, geofence_radius: 35, category: 'food', qr_code_data: 'BCSD-POI-002' },
+    { id: '3', name: 'Góc Chè & Nước Ép', description: 'Điểm dừng quen thuộc của dân địa phương với các loại chè truyền thống và nước ép trái cây nhiệt đới tươi mát.', latitude: 10.7545, longitude: 106.7028, geofence_radius: 30, category: 'food', qr_code_data: 'BCSD-POI-003' },
+    { id: '4', name: 'Chùa Vĩnh Khánh Cổ', description: 'Ngôi chùa cổ hơn 150 tuổi nằm giữa lòng phố ẩm thực, là nơi người dân địa phương đến cúng tế và cầu bình an.', latitude: 10.7565, longitude: 106.7050, geofence_radius: 50, category: 'historical', qr_code_data: 'BCSD-POI-004' },
 ];
 
 // Vĩnh Khánh street center: Q4, HCMC
@@ -80,13 +80,17 @@ export default function MapExplore() {
 
     const { position, permissionStatus } = useGeolocation();
 
-    // Fetch POIs khi có vị trí
+    // Fetch POIs từ backend khi có vị trí GPS
     useEffect(() => {
         if (!position) return;
         getPOIsNearMe(position.lat, position.lng)
-            .then((data) => { if (data.length > 0) setPois(data); })
-            .catch(() => { /* giữ mock data */ });
-        dispatch({ type: 'SET_NEARBY_POIS', payload: pois });
+            .then((data) => {
+                if (data.length > 0) {
+                    setPois(data);
+                    dispatch({ type: 'SET_NEARBY_POIS', payload: data });
+                }
+            })
+            .catch(() => { /* offline: giữ mock data */ });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [position?.lat, position?.lng]);
 
@@ -174,7 +178,7 @@ export default function MapExplore() {
                     {filteredPOIs.map((poi) => (
                         <Marker
                             key={poi.id}
-                            position={[poi.lat, poi.lng]}
+                            position={[poi.latitude, poi.longitude]}
                             icon={getPOIIcon(poi.category)}
                             eventHandlers={{ click: () => handlePOIMarkerClick(poi) }}
                         >
@@ -190,7 +194,7 @@ export default function MapExplore() {
                             </Popup>
                             {/* Geofence visualization */}
                             <Circle
-                                center={[poi.lat, poi.lng]}
+                                center={[poi.latitude, poi.longitude]}
                                 radius={poi.geofence_radius}
                                 pathOptions={{ color: '#ff6a00', fillColor: '#ff6a00', fillOpacity: 0.06, weight: 1, dashArray: '4 4' }}
                             />

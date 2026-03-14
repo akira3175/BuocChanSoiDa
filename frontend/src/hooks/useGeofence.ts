@@ -33,7 +33,7 @@ export function useGeofence({ pois, position, onEnter, onExit }: UseGeofenceOpti
         if (!position || pois.length === 0) return;
 
         pois.forEach((poi) => {
-            const dist = haversineDistance(position.lat, position.lng, poi.lat, poi.lng);
+            const dist = haversineDistance(position.lat, position.lng, poi.latitude, poi.longitude);
             const isCurrentlyInside = dist <= poi.geofence_radius;
             const wasPreviouslyInside = insideSetRef.current.has(poi.id);
 
@@ -52,7 +52,7 @@ export function useGeofence({ pois, position, onEnter, onExit }: UseGeofenceOpti
     // Utility để tính khoảng cách từ current position tới 1 POI cụ thể
     const getDistanceTo = useCallback((poi: POI): number => {
         if (!position) return Infinity;
-        return haversineDistance(position.lat, position.lng, poi.lat, poi.lng);
+        return haversineDistance(position.lat, position.lng, poi.latitude, poi.longitude);
     }, [position]);
 
     return { getDistanceTo };
