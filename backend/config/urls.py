@@ -10,6 +10,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('core.urls')),
     path('api/pois/', include('pois.urls')),
+    path('api/partners/', include('pois.partner_urls')),
     path('api/tours/', include('tours.urls')),
     path('api/users/', include('users.urls')),
     path('api/analytics/', include('analytics.urls')),

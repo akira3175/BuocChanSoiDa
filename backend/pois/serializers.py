@@ -19,6 +19,22 @@ class PartnerSerializer(serializers.ModelSerializer):
         fields = ['id', 'business_name', 'menu_details', 'opening_hours']
 
 
+class PartnerCRUDSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = Partner
+        fields = [
+            'id',
+            'poi',
+            'business_name',
+            'menu_details',
+            'opening_hours',
+            'status',
+            'status_display',
+        ]
+
+
 class POIListSerializer(serializers.ModelSerializer):
     """
     Serializer nhẹ cho near-me và scan — không embed media/partners
