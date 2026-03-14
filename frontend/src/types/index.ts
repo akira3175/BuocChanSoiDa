@@ -2,7 +2,7 @@
 
 export type Language = 'vi' | 'en' | 'zh' | 'ja' | 'ko';
 export type VoiceRegion = 'mien_nam' | 'mien_bac' | 'mien_trung' | 'usa' | 'uk';
-export type TriggerType = 'Auto' | 'QR';
+export type TriggerType = 'AUTO' | 'QR';
 export type POICategory = 'food' | 'historical' | 'cultural' | 'scenic';
 
 export interface User {
@@ -75,15 +75,24 @@ export interface TourReview {
 
 export interface NarrationLog {
     id?: string;
-    poi_id: string;
+    /** poi (BE dùng FK id số nguyên, gửi lên dưới dạng số) */
+    poi: number | string;
     start_time: string; // ISO
     trigger_type: TriggerType;
     duration?: number; // seconds
 }
 
+/** Response từ POST /api/analytics/narration/start/ */
+export interface NarrationStartResponse {
+    should_play: boolean;
+    log?: NarrationLog;
+    reason?: string;
+}
+
 export interface BreadcrumbPoint {
     lat: number;
-    lng: number;
+    /** Kinh độ — dùng 'long' để match field name của BE */
+    long: number;
     timestamp: string;
 }
 

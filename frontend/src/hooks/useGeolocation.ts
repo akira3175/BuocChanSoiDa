@@ -21,7 +21,7 @@ export interface GeoPosition {
     lng: number;
 }
 
-export function useGeolocation(userId?: string) {
+export function useGeolocation() {
     const [position, setPosition] = useState<GeoPosition | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [permissionStatus, setPermissionStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
@@ -30,16 +30,16 @@ export function useGeolocation(userId?: string) {
     const watchIdRef = useRef<number | null>(null);
 
     const flushBreadcrumbs = useCallback(async () => {
-        if (!userId || breadcrumbBuffer.current.length === 0) return;
+        if (breadcrumbBuffer.current.length === 0) return;
         const points = [...breadcrumbBuffer.current];
         breadcrumbBuffer.current = [];
         try {
-            await postBreadcrumbs(userId, points);
+            await postBreadcrumbs(points);
         } catch {
             // Re-add to buffer nếu offline (sẽ được sync sau)
             breadcrumbBuffer.current = [...points, ...breadcrumbBuffer.current];
         }
-    }, [userId]);
+    }, []);
 
     useEffect(() => {
         if (!navigator.geolocation) {
@@ -62,7 +62,7 @@ export function useGeolocation(userId?: string) {
 
                 const point: BreadcrumbPoint = {
                     lat: newPos.lat,
-                    lng: newPos.lng,
+                    long: newPos.lng,
                     timestamp: new Date().toISOString(),
                 };
                 breadcrumbBuffer.current.push(point);
@@ -91,8 +91,10 @@ export function useGeolocation(userId?: string) {
                 navigator.geolocation.clearWatch(watchIdRef.current);
             }
             clearInterval(flushTimer);
+            // Flush lần cuối khi component unmount
+            flushBreadcrumbs();
         };
-    }, [userId, flushBreadcrumbs]);
+    }, [flushBreadcrumbs]);
 
     const requestPermission = useCallback(() => {
         navigator.geolocation.getCurrentPosition(

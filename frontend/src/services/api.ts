@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { User, POI, Media, Partner, Tour, TourReview, NarrationLog, BreadcrumbPoint } from '../types';
+import type { User, POI, Media, Partner, Tour, TourReview, NarrationLog, NarrationStartResponse, BreadcrumbPoint } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -20,7 +20,7 @@ apiClient.interceptors.request.use((config) => {
             const syncQueue = JSON.parse(localStorage.getItem('bcsd_sync_queue') || '[]');
             syncQueue.push({
                 type: config.url?.includes('/narration/start') ? 'narration_start'
-                    : config.url?.includes('/narration/end') ? 'narration_end'
+                    : config.url?.includes('/narration') && config.url?.includes('/end') ? 'narration_end'
                         : config.url?.includes('/breadcrumbs') ? 'breadcrumb'
                             : 'unknown',
                 payload: config.data ? (typeof config.data === 'string' ? JSON.parse(config.data) : config.data) : {},
@@ -97,18 +97,39 @@ export const submitTourReview = async (review: Omit<TourReview, 'id' | 'created_
     return data;
 };
 
-// --- Log endpoints ---
-export const startNarration = async (log: Omit<NarrationLog, 'id' | 'duration'>): Promise<NarrationLog> => {
-    const { data } = await apiClient.post<NarrationLog>('/logs/narration/start', log);
+// --- Analytics / Log endpoints ---
+
+/**
+ * Gửi batch lên POST /api/analytics/narration/start/
+ * Response: { should_play, log?, reason? }
+ * - should_play = false → anti-spam blocked (trigger AUTO đã nghe trong 30 phút)
+ * - should_play = true  → tạo record thành công, trả về log
+ */
+export const startNarration = async (
+    payload: Pick<NarrationLog, 'poi' | 'trigger_type' | 'start_time'>
+): Promise<NarrationStartResponse> => {
+    const { data } = await apiClient.post<NarrationStartResponse>(
+        '/analytics/narration/start/',
+        payload
+    );
     return data;
 };
 
-export const endNarration = async (logId: string, duration: number): Promise<void> => {
-    await apiClient.put(`/logs/narration/end`, { log_id: logId, duration });
+/**
+ * PATCH /api/analytics/narration/<id>/end/
+ * Cập nhật số giây thực tế người dùng đã nghe.
+ */
+export const endNarration = async (logId: string | number, duration: number): Promise<void> => {
+    await apiClient.patch(`/analytics/narration/${logId}/end/`, { duration });
 };
 
-export const postBreadcrumbs = async (userId: string, points: BreadcrumbPoint[]): Promise<void> => {
-    await apiClient.post('/logs/breadcrumbs', { user_id: userId, points });
+/**
+ * POST /api/analytics/breadcrumbs/batch/
+ * Payload: { points: [{lat, long, timestamp}] }
+ * user được BE lấy từ JWT token, không cần gửi user_id.
+ */
+export const postBreadcrumbs = async (points: BreadcrumbPoint[]): Promise<void> => {
+    await apiClient.post('/analytics/breadcrumbs/batch/', { points });
 };
 
 // --- Offline data endpoint ---

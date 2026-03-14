@@ -8,8 +8,8 @@ const LOG_KEY = 'bcsd_narration_logs';
 interface NarrationLogLocal {
     poi_id: string;
     start_time: number; // timestamp ms
-    trigger_type: 'Auto' | 'QR';
-    log_id?: string;
+    trigger_type: 'AUTO' | 'QR';
+    log_id?: string | number;
 }
 
 function getLocalLogs(): NarrationLogLocal[] {
@@ -50,14 +50,14 @@ export function useNarrationEngine({
     /**
      * Kiểm tra Anti-Spam: POI này đã được nghe bởi trigger Auto trong 30 phút gần đây chưa?
      */
-    const checkAntiSpam = useCallback((poiId: string, triggerType: 'Auto' | 'QR'): boolean => {
+    const checkAntiSpam = useCallback((poiId: string, triggerType: 'AUTO' | 'QR'): boolean => {
         if (triggerType === 'QR') return false; // QR override: luôn phát
         const logs = getLocalLogs();
         const now = Date.now();
         const recentLog = logs.find(
             (l) =>
                 l.poi_id === poiId &&
-                l.trigger_type === 'Auto' &&
+                l.trigger_type === 'AUTO' &&
                 now - l.start_time < ANTI_SPAM_MINUTES * 60 * 1000
         );
         return !!recentLog; // true = bị spam, bỏ qua
@@ -67,18 +67,15 @@ export function useNarrationEngine({
      * Trigger narration cho 1 POI
      */
     const triggerNarration = useCallback(
-        async (poi: POI, triggerType: 'Auto' | 'QR' = 'Auto') => {
-            // 1. Kiểm tra Anti-Spam
+        async (poi: POI, triggerType: 'AUTO' | 'QR' = 'AUTO') => {
+            // 1. Kiểm tra Anti-Spam local (nhanh, dùng khi offline)
             if (checkAntiSpam(poi.id, triggerType)) return;
 
             // 2. Nếu đang phát bài khác
             if (isPlayingRef.current) {
                 if (triggerType === 'QR') {
-                    // QR force: phát ngay (interrupt)
-                    // Gọi onNarrationConflict để UI xử lý (dừng bài cũ, mở bài mới)
                     onNarrationConflict(poi);
                 } else {
-                    // Auto: đưa vào queue (caller xử lý thông qua PUSH_TO_QUEUE action)
                     onNarrationConflict(poi);
                 }
                 return;
@@ -96,13 +93,22 @@ export function useNarrationEngine({
             };
 
             try {
-                const serverLog = await startNarration({
-                    poi_id: poi.id,
+                const response = await startNarration({
+                    poi: Number(poi.id),
                     start_time: new Date().toISOString(),
                     trigger_type: triggerType,
                 });
-                logEntry.log_id = serverLog.id;
-                currentLogIdRef.current = serverLog.id || null;
+
+                // Server trả về should_play = false → Anti-Spam blocked phía server
+                if (!response.should_play) {
+                    isPlayingRef.current = false;
+                    currentPoiRef.current = null;
+                    return;
+                }
+
+                const logId = response.log?.id;
+                logEntry.log_id = logId;
+                currentLogIdRef.current = logId ?? null;
             } catch {
                 // Offline: lưu local để sync sau
                 currentLogIdRef.current = null;
