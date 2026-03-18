@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     # Local apps
     'core.apps.CoreConfig',
     'pois.apps.PoisConfig',
+    'partners.apps.PartnersConfig',
     'tours.apps.ToursConfig',
     'users.apps.UsersConfig',
     'analytics.apps.AnalyticsConfig',

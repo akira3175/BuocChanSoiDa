@@ -1,20 +1,15 @@
 from rest_framework import generics, status
-from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from users.permissions import IsAdminOrReadOnly
-
 from .models import Media, POI, Partner
 from .serializers import (
-    MediaCRUDSerializer,
     MediaSerializer,
     POIDetailSerializer,
     POIListSerializer,
-    PartnerCRUDSerializer,
-    PartnerSerializer,
 )
+from partners.serializers import PartnerSerializer
 
 # Bán kính tìm kiếm mặc định (mét)
 DEFAULT_RADIUS_M = 1000
@@ -142,54 +137,3 @@ class POIPartnersView(generics.ListAPIView):
             poi_id=self.kwargs['poi_id'],
             status=Partner.Status.ACTIVE,
         )
-
-
-class PartnerListCreateView(generics.ListCreateAPIView):
-    """
-    GET /api/partners/?poi_id=<id>&status=<0|1>&search=<keyword>
-    POST /api/partners/
-
-    Danh sách partner với filter tuỳ chọn:
-    - Không truyền status → trả toàn bộ (cả active lẫn inactive).
-    - status=1          → chỉ lấy đang hoạt động.
-    - status=0          → chỉ lấy đã tắt.
-    - poi_id            → lọc theo POI.
-    - search            → tìm kiếm theo tên cơ sở (không phân biệt hoa/thường).
-    """
-    serializer_class = PartnerCRUDSerializer
-    permission_classes = [IsAdminOrReadOnly]
-
-    _VALID_STATUS = {'0', '1'}
-
-    def get_queryset(self):
-        qs = Partner.objects.all().select_related('poi')
-
-        poi_id = self.request.query_params.get('poi_id')
-        status_param = self.request.query_params.get('status')
-        search = self.request.query_params.get('search', '').strip()
-
-        if poi_id:
-            qs = qs.filter(poi_id=poi_id)
-
-        if status_param not in (None, ''):
-            if status_param not in self._VALID_STATUS:
-                raise ValidationError(
-                    {'status': 'Giá trị không hợp lệ. Chỉ chấp nhận: 0 (inactive) hoặc 1 (active).'}
-                )
-            qs = qs.filter(status=int(status_param))
-
-        if search:
-            qs = qs.filter(business_name__icontains=search)
-
-        return qs.order_by('business_name')
-
-
-class PartnerDetailCRUDView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    GET /api/partners/<id>/
-    PUT/PATCH /api/partners/<id>/
-    DELETE /api/partners/<id>/
-    """
-    queryset = Partner.objects.all().select_related('poi')
-    serializer_class = PartnerCRUDSerializer
-    permission_classes = [IsAdminOrReadOnly]

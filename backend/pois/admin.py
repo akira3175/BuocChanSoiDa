@@ -73,9 +73,3 @@ class MediaAdmin(admin.ModelAdmin):
     list_select_related = ['poi']
 
 
-@admin.register(Partner)
-class PartnerAdmin(admin.ModelAdmin):
-    list_display = ['id', 'business_name', 'poi', 'opening_hours', 'status']
-    list_filter = ['status']
-    search_fields = ['business_name', 'poi__name']
-    list_select_related = ['poi']
