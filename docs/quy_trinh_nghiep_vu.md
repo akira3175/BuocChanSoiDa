@@ -45,6 +45,18 @@ Thu thập dữ liệu ẩn danh để cải thiện trải nghiệm và dịch 
 *   Thời gian nghe trung bình trên mỗi địa điểm (POI).
 *   Bản đồ nhiệt (Heatmap) về vị trí và mật độ người dùng.
 
+### 3.5. Tiếp Thị & Liên Kết Đối Tác (Partner Marketing)
+Hệ thống hỗ trợ Nhà hàng/Đối tác tham gia hệ sinh thái nội dung tại từng POI.
+*   **Hiển thị gợi ý theo POI đang nghe**:
+    *   Trong lúc phát thuyết minh, App hiển thị danh sách đối tác liên quan gần POI.
+    *   Ưu tiên hiển thị thông tin ngắn gọn: tên quán, món nổi bật, giờ mở cửa.
+*   **Quản lý nội dung giới thiệu của Partner**:
+    *   Partner nhập mô tả ngắn để hệ thống chuyển thành TTS.
+    *   Partner có thể tải file audio tự thu (được ưu tiên phát nếu hợp lệ).
+*   **Quản lý thông tin kinh doanh**:
+    *   Cập nhật menu và khung giờ hoạt động thông qua cổng quản trị.
+    *   Dữ liệu sau duyệt sẽ đồng bộ ra App cho người dùng.
+
 ## 4. Quy Trình Nghiệp Vụ (Business Processes)
 
 ### 4.1. Luồng Người Dùng (User Flow)
@@ -70,6 +82,24 @@ Thu thập dữ liệu ẩn danh để cải thiện trải nghiệm và dịch 
     *   Quyết định chọn file Audio (ưu tiên) hay tạo TTS.
 4.  **Audio Output**: Phát ra loa/tai nghe của thiết bị.
 
+### 4.3. Luồng Đối Tác (Partner Flow)
+1.  **Đăng ký/Hồ sơ đối tác**:
+    *   Partner được tạo tài khoản và gắn với một hoặc nhiều POI/khu vực hoạt động.
+    *   Cập nhật thông tin cơ sở: tên thương hiệu, địa chỉ, giờ mở cửa, trạng thái hoạt động.
+2.  **Tạo nội dung giới thiệu**:
+    *   Partner nhập nội dung văn bản giới thiệu quán/món đặc trưng.
+    *   Tùy chọn tải audio thu sẵn; nếu không có audio, hệ thống dùng TTS từ nội dung văn bản.
+3.  **Kiểm duyệt nội dung (Admin/CMS)**:
+    *   Nội dung mới hoặc chỉnh sửa được chuyển sang trạng thái chờ duyệt.
+    *   Admin kiểm tra tính hợp lệ (ngôn ngữ, độ dài, chất lượng audio, tính chính xác thông tin).
+    *   Sau duyệt, bản ghi được publish và đồng bộ cho client online/offline.
+4.  **Phân phối & Hiển thị trên App người dùng**:
+    *   Khi người dùng nghe thuyết minh tại POI, App gọi dữ liệu partner theo `poi_id`.
+    *   Hiển thị thẻ gợi ý nhà hàng trong bottom sheet; có thể kèm đoạn intro ngắn ở cuối bài thuyết minh.
+5.  **Theo dõi hiệu quả**:
+    *   Hệ thống ghi nhận lượt hiển thị/lượt tương tác với thẻ đối tác.
+    *   Dashboard hỗ trợ đánh giá hiệu quả nội dung và tối ưu chiến dịch quảng bá.
+
 ## 5. Kiến Trúc Sơ Bộ & Dữ Liệu
 
 ### 5.1. Thành phần
@@ -79,16 +109,19 @@ Thu thập dữ liệu ẩn danh để cải thiện trải nghiệm và dịch 
 *   **Server**:
     *   Web Server quản lý nội dung (CMS).
     *   API cung cấp dữ liệu POI, Gói nội dung.
+    *   API/Portal quản lý thông tin đối tác và nội dung giới thiệu.
     *   Nhận dữ liệu Log/Analytics.
 
 ### 5.2. Sơ đồ thực thể liên kết (ERD Sketch)
 *   **Entities (Thực thể)**:
     *   `POI` (Điểm tham quan): Tên, Tọa độ, Bán kính Geofence, Nội dung Text.
     *   `Media`: Link file Audio, Ngôn ngữ, Loại giọng.
+    *   `Partner`: Thông tin nhà hàng/đối tác, menu, giờ mở cửa.
     *   `Route` (Tuyến): Tập hợp các POI.
     *   `UserLog`: Lịch sử nghe, vị trí.
 *   **Quan hệ**: 
     *   Một POI có nhiều Media (Đa ngôn ngữ).
+    *   Một POI có thể liên kết nhiều Partner.
     *   Một Route đi qua nhiều POI.
 
 ## 6. Ghi Chú Phát Triển (Dev Notes)
