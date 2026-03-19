@@ -1,5 +1,19 @@
 import axios from 'axios';
-import type { User, POI, Media, Partner, Tour, TourReview, NarrationLog, NarrationStartResponse, BreadcrumbPoint } from '../types';
+import type {
+    User,
+    POI,
+    Media,
+    Partner,
+    Tour,
+    TourReview,
+    NarrationLog,
+    NarrationStartResponse,
+    BreadcrumbPoint,
+    PartnerAuthSession,
+    PartnerLoginPayload,
+    PartnerSignupPayload,
+    PartnerAuthUser,
+} from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -8,6 +22,82 @@ const apiClient = axios.create({
     timeout: 10000,
     headers: { 'Content-Type': 'application/json' },
 });
+
+const PARTNER_AUTH_STORAGE_KEY = 'bcsd_partner_auth';
+
+interface PartnerLoginResponse {
+    access: string;
+    refresh: string;
+    user: PartnerAuthUser;
+}
+
+interface PartnerSignupResponse {
+    message: string;
+    tokens: {
+        access: string;
+        refresh: string;
+    };
+    user: PartnerAuthUser;
+}
+
+const applyAuthHeader = (accessToken?: string) => {
+    if (accessToken) {
+        apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+        return;
+    }
+    delete apiClient.defaults.headers.common.Authorization;
+};
+
+export const getPartnerAuthSession = (): PartnerAuthSession | null => {
+    try {
+        const raw = localStorage.getItem(PARTNER_AUTH_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as PartnerAuthSession;
+    } catch {
+        return null;
+    }
+};
+
+export const setPartnerAuthSession = (session: PartnerAuthSession | null): void => {
+    if (!session) {
+        localStorage.removeItem(PARTNER_AUTH_STORAGE_KEY);
+        applyAuthHeader();
+        return;
+    }
+    localStorage.setItem(PARTNER_AUTH_STORAGE_KEY, JSON.stringify(session));
+    applyAuthHeader(session.tokens.access);
+};
+
+export const isPartnerAuthenticated = (): boolean => {
+    const session = getPartnerAuthSession();
+    return Boolean(session?.tokens.access);
+};
+
+export const createPartnerDemoSession = (email: string, username?: string): PartnerAuthSession => {
+    const normalizedEmail = email.trim().toLowerCase() || 'partner.demo@local';
+    const normalizedUsername = (username?.trim() || normalizedEmail.split('@')[0] || 'partner_demo').toLowerCase();
+
+    const session: PartnerAuthSession = {
+        user: {
+            id: `demo-${Date.now()}`,
+            email: normalizedEmail,
+            username: normalizedUsername,
+            full_name: 'Demo Partner',
+        },
+        tokens: {
+            access: `demo-access-${Date.now()}`,
+            refresh: `demo-refresh-${Date.now()}`,
+        },
+    };
+
+    setPartnerAuthSession(session);
+    return session;
+};
+
+const existingSession = getPartnerAuthSession();
+if (existingSession?.tokens.access) {
+    applyAuthHeader(existingSession.tokens.access);
+}
 
 // Offline mode interceptor - kiểm tra flag từ localStorage
 // Cơ chế Switch Logic: khi offline, request ghi (POST/PUT) vào SyncQueue,
@@ -40,6 +130,84 @@ apiClient.interceptors.request.use((config) => {
 export const initUser = async (deviceId: string): Promise<User> => {
     const { data } = await apiClient.post<User>('/users/init', { device_id: deviceId });
     return data;
+};
+
+export const loginPartner = async (payload: PartnerLoginPayload): Promise<PartnerAuthSession> => {
+    const { data } = await apiClient.post<PartnerLoginResponse>('/users/login/', payload);
+    const session: PartnerAuthSession = {
+        user: data.user,
+        tokens: {
+            access: data.access,
+            refresh: data.refresh,
+        },
+    };
+    setPartnerAuthSession(session);
+    return session;
+};
+
+export const loginUserAccount = async (payload: PartnerLoginPayload): Promise<PartnerAuthSession> => {
+    const { data } = await apiClient.post<PartnerLoginResponse>('/users/login/', payload);
+    return {
+        user: data.user,
+        tokens: {
+            access: data.access,
+            refresh: data.refresh,
+        },
+    };
+};
+
+export const signupPartner = async (payload: PartnerSignupPayload): Promise<PartnerAuthSession> => {
+    const { data } = await apiClient.post<PartnerSignupResponse>('/users/register/', payload);
+    const session: PartnerAuthSession = {
+        user: data.user,
+        tokens: {
+            access: data.tokens.access,
+            refresh: data.tokens.refresh,
+        },
+    };
+    setPartnerAuthSession(session);
+    return session;
+};
+
+export const signupUserAccount = async (payload: PartnerSignupPayload): Promise<PartnerAuthSession> => {
+    const { data } = await apiClient.post<PartnerSignupResponse>('/users/register/', payload);
+    return {
+        user: data.user,
+        tokens: {
+            access: data.tokens.access,
+            refresh: data.tokens.refresh,
+        },
+    };
+};
+
+export const logoutPartner = async (): Promise<void> => {
+    const session = getPartnerAuthSession();
+    try {
+        if (session?.tokens.refresh) {
+            await apiClient.post('/users/logout/', { refresh: session.tokens.refresh });
+        }
+    } finally {
+        setPartnerAuthSession(null);
+    }
+};
+
+export const getApiErrorMessage = (error: unknown, fallback = 'Có lỗi xảy ra, vui lòng thử lại.'): string => {
+    if (!axios.isAxiosError(error)) return fallback;
+
+    const responseData = error.response?.data;
+    if (typeof responseData === 'string') return responseData;
+
+    if (responseData && typeof responseData === 'object') {
+        if ('detail' in responseData && typeof responseData.detail === 'string') return responseData.detail;
+        if ('error' in responseData && typeof responseData.error === 'string') return responseData.error;
+        if ('message' in responseData && typeof responseData.message === 'string') return responseData.message;
+
+        const firstField = Object.values(responseData)[0];
+        if (Array.isArray(firstField) && typeof firstField[0] === 'string') return firstField[0];
+        if (typeof firstField === 'string') return firstField;
+    }
+
+    return fallback;
 };
 
 // --- POI endpoints ---

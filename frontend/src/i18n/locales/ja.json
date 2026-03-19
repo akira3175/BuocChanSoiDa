@@ -99,7 +99,40 @@
         "flashOff": "フラッシュオン"
     },
     "partner": {
-        "viewMenu": "メニューを見る"
+        "viewMenu": "メニューを見る",
+        "program": "パートナープログラム",
+        "portalTitle": "レストランパートナーハブ",
+        "entryDescription": "紹介文、メニュー、営業時間、配信効果を管理",
+        "poiLinked": "連携先: ヴィンカンフードストリート - 4区, ホーチミン市",
+        "status": {
+            "pending": "審査待ち",
+            "approved": "承認済み"
+        },
+        "contentSection": "紹介コンテンツ",
+        "ttsFallback": "録音音声優先、TTSは代替",
+        "introText": "短い紹介スクリプト",
+        "uploadAudio": "録音音声をアップロード",
+        "audioUploaded": "音声アップロード済み",
+        "previewButton": "プレビュー",
+        "businessSection": "店舗情報",
+        "openingHours": "営業時間",
+        "mustTry": "おすすめ料理",
+        "menuHighlight": "メニューハイライト",
+        "publishFlowTitle": "審査と公開フロー",
+        "publishFlow": {
+            "step1": "新規または更新コンテンツをCMS審査キューへ送信。",
+            "step2": "管理者が内容品質、長さ、音声の妥当性を確認。",
+            "step3": "承認後に公開され、ユーザーアプリへ同期。"
+        },
+        "performanceTitle": "パフォーマンス概要",
+        "stats": {
+            "impression": "パートナーカード表示数",
+            "interaction": "インタラクション",
+            "menuView": "メニュー閲覧数",
+            "conversion": "コンバージョン率"
+        },
+        "saveDraft": "下書きを保存",
+        "savedAt": "{{time}} に保存しました"
     },
     "review": {
         "writeReview": "レビューを書く",

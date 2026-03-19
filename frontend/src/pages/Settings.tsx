@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import AppLayout from '../components/AppLayout';
 import { SettingsSkeleton, staggerStyle } from '../components/Skeleton';
+import { setPartnerAuthSession } from '../services/api';
 import type { Language, VoiceRegion } from '../types';
 
 const LANGUAGES: { value: Language; label: string; flag: string }[] = [
@@ -15,6 +17,7 @@ const LANGUAGES: { value: Language; label: string; flag: string }[] = [
 
 export default function Settings() {
     const { t, i18n } = useTranslation();
+    const navigate = useNavigate();
     const { user, dispatch } = useApp();
     const [language, setLanguage] = useState<Language>(user?.preferred_language || 'vi');
     const [voiceRegion, setVoiceRegion] = useState<VoiceRegion>(user?.preferred_voice_region || 'mien_nam');
@@ -42,6 +45,18 @@ export default function Settings() {
         i18n.changeLanguage(language);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+    };
+
+    const handleOpenPartnerPortal = () => {
+        // Luôn hiển thị màn login/signup partner khi đi từ mục GÓC ĐỐI TÁC.
+        setPartnerAuthSession(null);
+        navigate('/partner/login?next=%2Fpartner');
+    };
+
+    const handleUserLogout = () => {
+        localStorage.removeItem('bcsd_user_auth');
+        dispatch({ type: 'CLEAR_USER' });
+        navigate('/', { replace: true });
     };
 
     if (loading) {
@@ -135,14 +150,40 @@ export default function Settings() {
                 </div>
             </div>
 
+            {/* Partner Portal Entry */}
+            <div className="mx-4 mt-5 animate-stagger-item" style={staggerStyle(3)}>
+                <button
+                    onClick={handleOpenPartnerPortal}
+                    className="w-full overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-r from-orange-50 via-amber-50 to-white p-4 text-left shadow-sm transition hover:shadow-md"
+                >
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-primary/80">{t('partner.program')}</p>
+                            <h3 className="mt-1 text-sm font-bold text-slate-900">{t('partner.portalTitle')}</h3>
+                            <p className="mt-1 text-xs text-slate-500">{t('partner.entryDescription')}</p>
+                        </div>
+                        <div className="flex size-10 items-center justify-center rounded-full bg-primary text-white">
+                            <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>storefront</span>
+                        </div>
+                    </div>
+                </button>
+            </div>
+
             {/* Save Button */}
-            <div className="mx-4 mt-6 mb-4 animate-stagger-item" style={staggerStyle(3)}>
+            <div className="mx-4 mt-6 mb-4 animate-stagger-item" style={staggerStyle(4)}>
                 <button
                     onClick={handleSave}
                     className={`w-full py-4 rounded-2xl font-bold text-base tap-scale transition-all shadow-lg ${saved ? 'bg-green-500 text-white shadow-green-200 animate-bounce-in' : 'bg-primary text-white shadow-primary\/20 hover:shadow-xl'
                         }`}
                 >
                     {saved ? t('common.saved') : t('common.save')}
+                </button>
+
+                <button
+                    onClick={handleUserLogout}
+                    className="mt-3 w-full rounded-2xl border border-rose-200 bg-rose-50 py-3 text-sm font-bold text-rose-700 transition hover:bg-rose-100"
+                >
+                    Đăng xuất tài khoản người dùng
                 </button>
             </div>
         </AppLayout>

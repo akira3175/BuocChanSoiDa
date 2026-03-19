@@ -99,7 +99,40 @@
         "flashOff": "开启闪光灯"
     },
     "partner": {
-        "viewMenu": "查看菜单"
+        "viewMenu": "查看菜单",
+        "program": "合作伙伴计划",
+        "portalTitle": "餐厅合作伙伴中心",
+        "entryDescription": "管理介绍内容、菜单、营业时间与活动效果",
+        "poiLinked": "关联点位：永庆美食街 - 第4郡，胡志明市",
+        "status": {
+            "pending": "待审核",
+            "approved": "已审核"
+        },
+        "contentSection": "介绍内容",
+        "ttsFallback": "优先录音，TTS兜底",
+        "introText": "简短介绍文案",
+        "uploadAudio": "上传录音",
+        "audioUploaded": "已上传音频",
+        "previewButton": "预览",
+        "businessSection": "商家信息",
+        "openingHours": "营业时间",
+        "mustTry": "推荐菜品",
+        "menuHighlight": "主推菜单",
+        "publishFlowTitle": "审核与发布流程",
+        "publishFlow": {
+            "step1": "提交新内容或修改内容，进入CMS审核队列。",
+            "step2": "管理员审核内容质量、长度与音频有效性。",
+            "step3": "审核通过后发布，并同步到用户端应用。"
+        },
+        "performanceTitle": "效果概览",
+        "stats": {
+            "impression": "合作卡片曝光",
+            "interaction": "互动次数",
+            "menuView": "菜单查看",
+            "conversion": "转化率"
+        },
+        "saveDraft": "保存草稿",
+        "savedAt": "已于 {{time}} 保存"
     },
     "review": {
         "writeReview": "写评价",

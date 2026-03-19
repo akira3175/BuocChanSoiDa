@@ -99,7 +99,40 @@
         "flashOff": "Flash on"
     },
     "partner": {
-        "viewMenu": "View menu"
+        "viewMenu": "View menu",
+        "program": "Partner program",
+        "portalTitle": "Restaurant partner hub",
+        "entryDescription": "Manage intro content, menu, opening hours, and campaign performance",
+        "poiLinked": "Linked to: Vinh Khanh Food Street - District 4, HCMC",
+        "status": {
+            "pending": "Pending approval",
+            "approved": "Approved"
+        },
+        "contentSection": "Introduction content",
+        "ttsFallback": "Recorded audio first, TTS fallback",
+        "introText": "Short introduction script",
+        "uploadAudio": "Upload recorded audio",
+        "audioUploaded": "Audio uploaded",
+        "previewButton": "Preview",
+        "businessSection": "Business information",
+        "openingHours": "Opening hours",
+        "mustTry": "Must-try dishes",
+        "menuHighlight": "Menu highlights",
+        "publishFlowTitle": "Review and publishing flow",
+        "publishFlow": {
+            "step1": "Submit new or updated content into the CMS review queue.",
+            "step2": "Admin verifies content quality, length, and audio validity.",
+            "step3": "After approval, content is published and synced to user apps."
+        },
+        "performanceTitle": "Performance overview",
+        "stats": {
+            "impression": "Partner card impressions",
+            "interaction": "Interactions",
+            "menuView": "Menu views",
+            "conversion": "Conversion rate"
+        },
+        "saveDraft": "Save partner draft",
+        "savedAt": "Saved at {{time}}"
     },
     "review": {
         "writeReview": "Write a Review",
