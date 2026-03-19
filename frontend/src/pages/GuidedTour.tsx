@@ -86,33 +86,6 @@ function FitBounds({ points }: { points: [number, number][] }) {
     return null;
 }
 
-// Mock data phố Vĩnh Khánh
-const MOCK_TOURS: Tour[] = [
-    {
-        id: 't1', name: 'Xuyên Đêm Phố Vĩnh Khánh',
-        description: 'Khám phá các hàng quán đêm sầm uất nhất phố Vĩnh Khánh.',
-        status: 1, is_suggested: true, estimated_duration_min: 90,
-        pois: [
-            { poi: { id: '1', name: 'Hẻm Bánh Tráng Nướng', description: 'Bánh tráng nướng giòn rụm với đầy đủ topping', latitude: 10.755, longitude: 106.7035, geofence_radius: 40, category: 'food', qr_code_data: 'BCSD-POI-001' }, sequence_order: 1 },
-            { poi: { id: '2', name: 'Quán Hải Sản Đêm', description: 'Ghẹ rang me, ốc hương xào, tôm nướng muối ớt', latitude: 10.7558, longitude: 106.7042, geofence_radius: 35, category: 'food', qr_code_data: 'BCSD-POI-002' }, sequence_order: 2 },
-            { poi: { id: '3', name: 'Góc Chè & Nước Ép', description: 'Chè truyền thống và nước ép nhiệt đới', latitude: 10.7545, longitude: 106.7028, geofence_radius: 30, category: 'food', qr_code_data: 'BCSD-POI-003' }, sequence_order: 3 },
-        ],
-    },
-    {
-        id: 't2', name: 'Văn Hóa Phố Quận 4',
-        description: 'Chùa cổ, gốc cây bồ đề và câu chuyện lịch sử khu dân cư lâu đời nhất Quận 4.',
-        status: 1, is_suggested: true, estimated_duration_min: 60,
-        pois: [
-            { poi: { id: '4', name: 'Chùa Vĩnh Khánh Cổ', description: 'Ngôi chùa 150 tuổi giữa phố ẩm thực', latitude: 10.7565, longitude: 106.705, geofence_radius: 50, category: 'historical', qr_code_data: 'BCSD-POI-004' }, sequence_order: 1 },
-        ],
-    },
-    {
-        id: 't3', name: 'Ẩm Thực Bình Dân Sài Gòn',
-        description: 'Lang thang và thưởng thức các món ăn bình dân nổi tiếng nhất Sài Gòn.',
-        status: 1, is_suggested: false, estimated_duration_min: 120, pois: [],
-    },
-];
-
 const OFF_ROUTE_THRESHOLD_M = 100; // cảnh báo khi đi chệch >100m
 
 type POIStatus = 'completed' | 'current' | 'upcoming';
@@ -149,8 +122,14 @@ export default function GuidedTour() {
     useEffect(() => {
         const timer = setTimeout(() => {
             getTours()
-                .then((data) => { setTours(data.length > 0 ? data : MOCK_TOURS); setSelectedTour(data.length > 0 ? data[0] : MOCK_TOURS[0]); })
-                .catch(() => { setTours(MOCK_TOURS); setSelectedTour(MOCK_TOURS[0]); })
+                .then((data) => {
+                    setTours(data);
+                    setSelectedTour(data[0] ?? null);
+                })
+                .catch(() => {
+                    setTours([]);
+                    setSelectedTour(null);
+                })
                 .finally(() => setLoading(false));
         }, 600);
         return () => clearTimeout(timer);
@@ -225,7 +204,7 @@ export default function GuidedTour() {
         closeNarration();
     }, [finishNarration, closeNarration]);
 
-    if (loading || !selectedTour) {
+    if (loading) {
         return (
             <AppLayout title={t('tour.title')} headerAction={
                 <button className="flex items-center justify-center size-10 rounded-full text-slate-400">
@@ -233,6 +212,25 @@ export default function GuidedTour() {
                 </button>
             }>
                 <GuidedTourSkeleton />
+            </AppLayout>
+        );
+    }
+
+    if (!selectedTour) {
+        return (
+            <AppLayout
+                title={t('tour.title')}
+                headerAction={
+                    <button className="flex items-center justify-center size-10 rounded-full text-slate-700 hover:bg-slate-100 tap-scale">
+                        <span className="material-symbols-outlined text-xl">search</span>
+                    </button>
+                }
+            >
+                <div className="px-4 py-10 text-center">
+                    <span className="material-symbols-outlined text-6xl text-slate-300 mb-3 block">hiking</span>
+                    <p className="text-slate-600 font-semibold">{t('tour.noTours', { defaultValue: 'Chưa có tour khả dụng' })}</p>
+                    <p className="text-slate-400 text-sm mt-1">{t('tour.tryAgainLater', { defaultValue: 'Vui lòng thử lại sau' })}</p>
+                </div>
             </AppLayout>
         );
     }

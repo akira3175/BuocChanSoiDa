@@ -78,8 +78,13 @@ export const getPOIPartners = async (poiId: string): Promise<Partner[]> => {
 
 // --- Tour endpoints ---
 export const getTours = async (): Promise<Tour[]> => {
-    const { data } = await apiClient.get<Tour[]>('/tours');
-    return data;
+    const { data } = await apiClient.get('/tours');
+    // DRF pagination support: { count, next, previous, results: [...] }
+    if (Array.isArray(data)) return data as Tour[];
+    if (data && Array.isArray((data as { results?: unknown }).results)) {
+        return (data as { results: Tour[] }).results;
+    }
+    return [];
 };
 
 export const getTourById = async (id: string): Promise<Tour> => {

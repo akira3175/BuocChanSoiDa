@@ -4,9 +4,9 @@ from .models import Tour, Tour_POI
 
 @admin.register(Tour)
 class TourAdmin(admin.ModelAdmin):
-    list_display = ('id', 'tour_name', 'created_by', 'is_suggested', 'status')
+    list_display = ('id', 'tour_name', 'estimated_duration_min', 'created_by', 'is_suggested', 'status')
     list_filter = ('status', 'is_suggested')
-    search_fields = ('tour_name', 'created_by__username')
+    search_fields = ('tour_name', 'description', 'created_by__username')
 
 
 @admin.register(Tour_POI)

@@ -17,7 +17,11 @@ class TourListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        return Tour.objects.filter(status=Tour.Status.ACTIVE)
+        return (
+            Tour.objects
+            .filter(status=Tour.Status.ACTIVE)
+            .prefetch_related('tour_pois__poi')
+        )
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
