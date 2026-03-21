@@ -102,3 +102,36 @@ export interface NarrationState {
     duration: number;
     playbackRate: number;
 }
+
+export interface PartnerAuthUser {
+    id: string;
+    email: string;
+    username: string;
+    full_name?: string;
+    preferred_language?: Language;
+    preferred_voice_region?: VoiceRegion;
+}
+
+export interface PartnerAuthTokens {
+    access: string;
+    refresh: string;
+}
+
+export interface PartnerAuthSession {
+    user: PartnerAuthUser;
+    tokens: PartnerAuthTokens;
+}
+
+export interface PartnerLoginPayload {
+    email: string;
+    password: string;
+}
+
+export interface PartnerSignupPayload {
+    email: string;
+    username: string;
+    password: string;
+    password_confirm: string;
+    first_name?: string;
+    last_name?: string;
+}

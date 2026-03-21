@@ -12,6 +12,7 @@ interface AppState {
 
 type AppAction =
     | { type: 'SET_USER'; payload: User }
+    | { type: 'CLEAR_USER' }
     | { type: 'SET_ONLINE'; payload: boolean }
     | { type: 'SET_OFFLINE_READY'; payload: boolean }
     | { type: 'PUSH_TO_QUEUE'; payload: POI }
@@ -24,6 +25,8 @@ function reducer(state: AppState, action: AppAction): AppState {
     switch (action.type) {
         case 'SET_USER':
             return { ...state, user: action.payload };
+        case 'CLEAR_USER':
+            return { ...state, user: null };
         case 'SET_ONLINE':
             return { ...state, isOnline: action.payload };
         case 'SET_OFFLINE_READY':

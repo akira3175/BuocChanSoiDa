@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppProvider } from './context/AppContext';
 import PageTransition from './components/PageTransition';
+import RequirePartnerAuth from './components/RequirePartnerAuth';
 import SplashScreen from './pages/SplashScreen';
 import './index.css';
 
@@ -11,6 +12,10 @@ const MapExplore = lazy(() => import('./pages/MapExplore'));
 const GuidedTour = lazy(() => import('./pages/GuidedTour'));
 const OfflineDownload = lazy(() => import('./pages/OfflineDownload'));
 const Settings = lazy(() => import('./pages/Settings'));
+const UserAuth = lazy(() => import('./pages/UserAuth'));
+const PartnerPortal = lazy(() => import('./pages/PartnerPortal'));
+const PartnerLogin = lazy(() => import('./pages/PartnerLogin'));
+const PartnerSignup = lazy(() => import('./pages/PartnerSignup'));
 
 function LazyFallback() {
   const { t } = useTranslation();
@@ -32,11 +37,15 @@ export default function App() {
           <Suspense fallback={<LazyFallback />}>
             <PageTransition>
               <Routes>
-                <Route path="/" element={<SplashScreen />} />
+                <Route path="/" element={<UserAuth />} />
+                <Route path="/splash" element={<SplashScreen />} />
                 <Route path="/map" element={<MapExplore />} />
                 <Route path="/tours" element={<GuidedTour />} />
                 <Route path="/offline" element={<OfflineDownload />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/partner/login" element={<PartnerLogin />} />
+                <Route path="/partner/signup" element={<PartnerSignup />} />
+                <Route path="/partner" element={<RequirePartnerAuth><PartnerPortal /></RequirePartnerAuth>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </PageTransition>
