@@ -255,7 +255,7 @@ export const getPOIPartners = async (poiId: string): Promise<Partner[]> => {
 
 // --- Tour endpoints ---
 export const getTours = async (): Promise<Tour[]> => {
-    const { data } = await apiClient.get('/tours');
+    const { data } = await apiClient.get('/tours/');
     // DRF pagination support: { count, next, previous, results: [...] }
     if (Array.isArray(data)) return data as Tour[];
     if (data && Array.isArray((data as { results?: unknown }).results)) {
@@ -265,17 +265,17 @@ export const getTours = async (): Promise<Tour[]> => {
 };
 
 export const getTourById = async (id: string): Promise<Tour> => {
-    const { data } = await apiClient.get<Tour>(`/tours/${id}`);
+    const { data } = await apiClient.get<Tour>(`/tours/${id}/`);
     return data;
 };
 
 export const getTourReviews = async (tourId: string): Promise<TourReview[]> => {
-    const { data } = await apiClient.get<TourReview[]>(`/tours/${tourId}/reviews`);
+    const { data } = await apiClient.get<TourReview[]>(`/tours/${tourId}/reviews/`);
     return data;
 };
 
 export const submitTourReview = async (review: Omit<TourReview, 'id' | 'created_at'>): Promise<TourReview> => {
-    const { data } = await apiClient.post<TourReview>(`/tours/${review.tour_id}/reviews`, review);
+    const { data } = await apiClient.post<TourReview>(`/tours/${review.tour_id}/reviews/`, review);
     return data;
 };
 
