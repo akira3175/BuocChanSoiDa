@@ -137,6 +137,12 @@ class Partner(models.Model):
         verbose_name='Điểm tham quan',
     )
     business_name = models.CharField('Tên cơ sở', max_length=255)
+    intro_text = models.TextField(
+        'Đoạn giới thiệu TTS',
+        blank=True,
+        default='',
+        help_text='Đoạn văn ngắn giới thiệu cơ sở cho TTS. Để trống để tự động sinh từ thông tin menu.',
+    )
     menu_details = models.JSONField(
         'Chi tiết menu',
         default=dict,

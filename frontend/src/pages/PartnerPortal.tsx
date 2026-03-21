@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import { logoutPartner } from '../services/api';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
 
 type ApprovalStatus = 'pending' | 'approved' | 'needs_fix';
 type PartnerTab = 'profile' | 'content' | 'distribution' | 'analytics';
@@ -74,6 +75,7 @@ export default function PartnerPortal() {
   const [draft, setDraft] = useState<PartnerDraft>(DEFAULT_DRAFT);
   const [savedAt, setSavedAt] = useState<string>('');
   const [loggingOut, setLoggingOut] = useState(false);
+  const { isPlaying, speakTTS, pause } = useAudioPlayer();
 
   const stats = useMemo<CampaignStat[]>(
     () => [
@@ -124,6 +126,14 @@ export default function PartnerPortal() {
     } finally {
       navigate('/partner/login?next=%2Fpartner', { replace: true });
       setLoggingOut(false);
+    }
+  };
+
+  const handleTestIntro = () => {
+    if (isPlaying) {
+      pause();
+    } else if (draft.introText) {
+      speakTTS(draft.introText, 'vi-VN');
     }
   };
 
@@ -250,8 +260,12 @@ export default function PartnerPortal() {
         >
           {draft.hasAudioUpload ? 'Đã tải audio thu sẵn' : 'Tải audio thu sẵn'}
         </button>
-        <button className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white">
-          Nghe thử intro
+        <button 
+          onClick={handleTestIntro}
+          className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white flex items-center justify-center gap-1"
+        >
+          <span className="material-symbols-outlined text-sm">{isPlaying ? 'stop_circle' : 'play_circle'}</span>
+          {isPlaying ? 'Dừng nghe' : 'Nghe thử intro'}
         </button>
       </div>
     </section>

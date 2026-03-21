@@ -12,7 +12,7 @@ User = get_user_model()
 class PartnerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Partner
-        fields = ['id', 'business_name', 'menu_details', 'opening_hours']
+        fields = ['id', 'business_name', 'intro_text', 'menu_details', 'opening_hours']
 
 
 class PartnerCRUDSerializer(serializers.ModelSerializer):
@@ -24,6 +24,7 @@ class PartnerCRUDSerializer(serializers.ModelSerializer):
             'id',
             'poi',
             'business_name',
+            'intro_text',
             'menu_details',
             'opening_hours',
             'status',

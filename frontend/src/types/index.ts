@@ -40,8 +40,12 @@ export interface Media {
 export interface Partner {
     id: string;
     business_name: string;
+    intro_text?: string;
     menu_details?: { must_try?: string[]; price_range?: string };
     opening_hours?: string;
+    distance_meters?: number;
+    avg_price?: number;
+    image_url?: string;
 }
 
 export interface Tour {

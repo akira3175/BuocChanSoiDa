@@ -240,8 +240,17 @@ export const getPOIMedia = async (poiId: string, language: string, voiceRegion: 
 };
 
 export const getPOIPartners = async (poiId: string): Promise<Partner[]> => {
-    const { data } = await apiClient.get<Partner[]>(`/pois/${poiId}/partners`);
-    return data;
+    try {
+        const { data } = await apiClient.get(`/pois/${poiId}/partners`);
+        // Handle DRF pagination: { count, results: [...] } hoặc plain array
+        if (Array.isArray(data)) return data as Partner[];
+        if (data && Array.isArray((data as { results?: unknown }).results)) {
+            return (data as { results: Partner[] }).results;
+        }
+        return [];
+    } catch {
+        return [];
+    }
 };
 
 // --- Tour endpoints ---
