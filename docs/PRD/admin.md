@@ -80,3 +80,43 @@ flowchart TD
     ActivePartner --> End
     RejectPartner --> End
 ```
+
+## 6. System Architecture Flow (Operational Flow)
+Sơ đồ quản lý dữ liệu ứng dụng (Application Data Management) và luồng duyệt nội dung của Admin.
+
+```mermaid
+flowchart LR
+    %% Định nghĩa Style
+    style AdminDashboard fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px
+    style BackendServices fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style DataStorage fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+    subgraph AdminDashboard [Admin Dashboard]
+        direction TB
+        AdminIcon((Admin))
+        PanelUI[Web Control Panel]
+        AdminIcon <--> PanelUI
+    end
+    
+    subgraph BackendServices [Core System Processing]
+        direction TB
+        POIMgmt[POI Catalog API]
+        Moderation[Moderation / TTS API]
+    end
+    
+    subgraph DataStorage [Robust Data Pipeline]
+        direction TB
+        MasterDB[(Master Postgres DB)]
+        DataLake[(Audit Logs / Data Lake)]
+    end
+    
+    %% Flows
+    PanelUI <-->|CRUD POI / Partner Actions| POIMgmt
+    PanelUI <-->|Approve Audio / Generate TTS| Moderation
+    
+    POIMgmt <-->|Commit Structured Data| MasterDB
+    Moderation <-->|Update Asset Status| MasterDB
+    
+    POIMgmt -.->|Stream Audit Events| DataLake
+    Moderation -.->|Stream Audit Events| DataLake
+```

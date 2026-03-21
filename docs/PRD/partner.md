@@ -37,7 +37,7 @@ Các chức năng chính mà đối tác có thể thực hiện trên Portal.
 flowchart LR
     Partner([Đối tác Kinh doanh])
     
-    UC1(Cập nhật Thông tin cơ sở)
+    UC1(Cập nhật Thông đón cơ sở)
     UC2(Cập nhật Menu / Sản phẩm)
     UC3(Upload Audio giới thiệu)
     UC4(Cấu hình Ngôn ngữ / Giọng đọc)
@@ -70,4 +70,42 @@ flowchart TD
     SelectTime --> FetchData[Truy xuất Metrics Impression/Click/Call]
     FetchData --> ShowChart[Hiển thị Biểu đồ/Thống kê]
     ShowChart --> End
+```
+
+## 6. System Architecture Flow (Operational Flow)
+Sơ đồ luồng hệ thống cấu trúc 3 lớp, mô tả dòng chảy dữ liệu (Data Pipeline) của đối tác.
+
+```mermaid
+flowchart LR
+    %% Định nghĩa Style
+    style Portal fill:#fdf1e6,stroke:#e67e22,stroke-width:2px
+    style Backend fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style DB fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+    subgraph Portal [Partner Portal Application]
+        direction TB
+        PartnerIcon((Partner))
+        WebUI[Web Dashboard UI]
+        PartnerIcon <--> WebUI
+    end
+    
+    subgraph Backend [Backend API Services]
+        direction TB
+        BusinessAPI[Business Profile Service]
+        AnalyticsAPI[Data Analytics Service]
+    end
+    
+    subgraph DB [Data Pipeline & Storage]
+        direction TB
+        MainDB[(Partner Database)]
+        Redis[(Log Cache / Redis)]
+    end
+    
+    %% Flows
+    WebUI <-->|Upload Media / Profile Update| BusinessAPI
+    WebUI <-->|Fetch BI Metrics / Graphs| AnalyticsAPI
+    
+    BusinessAPI <-->|Write Profile / Sync| MainDB
+    AnalyticsAPI <-->|Aggregate Interactions| Redis
+    Redis -.->|Periodic Sync| MainDB
 ```

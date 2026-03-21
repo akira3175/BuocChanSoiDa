@@ -80,3 +80,41 @@ flowchart TD
     Interact --> End([Kết thúc])
     AutoPlay --> End
 ```
+
+## 6. System Architecture Flow (Operational Flow)
+Sơ đồ luồng hệ thống (System Flow) dựa trên cấu trúc Client - Backend - Database, mô tả cách dữ liệu được luân chuyển.
+
+```mermaid
+flowchart LR
+    %% Định nghĩa Style
+    style ClientApp fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style BackendServices fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style DataManagement fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+    subgraph ClientApp [Client Application]
+        direction TB
+        UserIcon((User))
+        UI[Mobile App Interface]
+        UserIcon <--> UI
+    end
+    
+    subgraph BackendServices [Backend Infrastructure]
+        direction TB
+        NavService[Navigation & POI Service]
+        MediaEngine[Narration & TTS Engine]
+    end
+    
+    subgraph DataManagement [Data Storage Pipeline]
+        direction TB
+        DB[(Main Database)]
+        Cloud[(Cloud Audio Storage)]
+    end
+    
+    %% Flows
+    UI <-->|Request POI / Send Coordinates| NavService
+    UI <-->|Fetch Audio / Request TTS| MediaEngine
+    
+    NavService <-->|Geo-Spatial Query| DB
+    MediaEngine <-->|Fetch Metadata| DB
+    MediaEngine <-->|Retrieve Audio Files| Cloud
+```
