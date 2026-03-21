@@ -6,6 +6,21 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+# ── Custom Admin Branding & Dashboard Stats ─────────────────────────────────
+# Patch admin.site.index để inject realtime stats vào trang chủ admin.
+# Tất cả @admin.register(...) vẫn dùng admin.site (không thay đổi registry).
+from config.admin import BCSDAdminSite as _BCSDAdminSite
+
+admin.site.site_header = 'Bước Chân Sói Đá · CMS'
+admin.site.site_title  = 'BCSD Admin'
+admin.site.index_title = '🏕️  Tổng quan hệ thống'
+
+# Gắn _get_stats và override index từ BCSDAdminSite sang admin.site
+import types as _types
+_bcsd_cls = _BCSDAdminSite
+admin.site._get_stats = _types.MethodType(_bcsd_cls._get_stats, admin.site)
+admin.site.index      = _types.MethodType(_bcsd_cls.index,      admin.site)
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('core.urls')),

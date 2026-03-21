@@ -44,7 +44,8 @@ class BreadcrumbLogBatchSerializer(serializers.Serializer):
     )
 
     def create(self, validated_data):
-        user = self.context['request'].user
+        request = self.context['request']
+        user = request.user if request.user.is_authenticated else None
         objs = [
             BreadcrumbLog(
                 user=user,
@@ -94,7 +95,8 @@ class NarrationLogStartSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        user = self.context['request'].user
+        request = self.context['request']
+        user = request.user if request.user.is_authenticated else None
         if 'start_time' not in validated_data:
             validated_data['start_time'] = timezone.now()
         return NarrationLog.objects.create(user=user, **validated_data)

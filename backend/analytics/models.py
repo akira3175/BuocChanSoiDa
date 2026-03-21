@@ -16,6 +16,8 @@ class BreadcrumbLog(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name='breadcrumbs',
         verbose_name='Người dùng',
     )
@@ -62,6 +64,8 @@ class NarrationLog(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name='narration_logs',
         verbose_name='Người dùng',
     )

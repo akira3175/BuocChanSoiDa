@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework import generics, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -43,7 +43,7 @@ class BreadcrumbBatchCreateView(APIView):
         "count": 3
     }
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Anonymous users cũng được ghi breadcrumb
 
     def post(self, request):
         serializer = BreadcrumbLogBatchSerializer(
@@ -82,7 +82,7 @@ class NarrationStartView(APIView):
     Response 201 (tạo record):  { "should_play": true, "log": {...} }
     Response 200 (bị chặn):     { "should_play": false, "reason": "..." }
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Anonymous users cũng được trigger narration
 
     def post(self, request):
         serializer = NarrationLogStartSerializer(
@@ -95,9 +95,9 @@ class NarrationStartView(APIView):
         poi = serializer.validated_data['poi']
 
         # ----------------------------------------------------------------
-        # Anti-Spam check (chỉ áp dụng cho trigger AUTO)
+        # Anti-Spam check (chỉ áp dụng cho trigger AUTO và user đã đăng nhập)
         # ----------------------------------------------------------------
-        if trigger_type == NarrationLog.TriggerType.AUTO:
+        if trigger_type == NarrationLog.TriggerType.AUTO and request.user.is_authenticated:
             cutoff = timezone.now() - timedelta(minutes=ANTI_SPAM_MINUTES)
             already_played = NarrationLog.objects.filter(
                 user=request.user,
@@ -143,12 +143,15 @@ class NarrationEndView(generics.UpdateAPIView):
     Request body: { "duration": 45 }
     """
     serializer_class = NarrationLogEndSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Anonymous users cũng được gửi end event
     http_method_names = ['patch']
 
     def get_queryset(self):
-        # Chỉ cho phép user cập nhật log của chính mình
-        return NarrationLog.objects.filter(user=self.request.user)
+        # Nếu đã đăng nhập, chỉ cho phép update log của chính mình
+        if self.request.user.is_authenticated:
+            return NarrationLog.objects.filter(user=self.request.user)
+        # Anonymous: lọc theo log không có user (chỉ update log của guest)
+        return NarrationLog.objects.filter(user__isnull=True)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
