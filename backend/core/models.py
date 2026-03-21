@@ -17,12 +17,14 @@ class Media(models.Model):
         INACTIVE = 0, 'Không hoạt động'
         ACTIVE = 1, 'Hoạt động'
 
-    # TODO: Chuyển thành ForeignKey('pois.POI') khi POI model được tạo
-    poi_id = models.IntegerField(
-        'Mã điểm tham quan',
+    poi = models.ForeignKey(
+        'pois.POI',
+        on_delete=models.SET_NULL,
+        verbose_name='Mã điểm tham quan',
         null=True,
         blank=True,
-        help_text='ID của POI (sẽ chuyển thành ForeignKey khi POI model sẵn sàng)',
+        related_name='core_media',
+        help_text='Điểm tham quan liên kết',
     )
 
     file = CloudinaryField(

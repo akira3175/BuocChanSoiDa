@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { useApp } from '../context/AppContext';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useGeofence } from '../hooks/useGeofence';
 import { useNarrationEngine } from '../hooks/useNarrationEngine';
+import { unlockAudioAndTTS } from '../hooks/useAudioPlayer';
 import { getPOIsNearMe } from '../services/api';
 import NarrationBottomSheet from '../components/NarrationBottomSheet';
 import QRScanOverlay from '../components/QRScanOverlay';
@@ -58,6 +59,25 @@ function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
     return null;
 }
 
+// Component cho phép click mock tọa độ
+function MapClickInterceptor({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
+    useMapEvents({
+        click(e) {
+            onMapClick(e.latlng.lat, e.latlng.lng);
+        }
+    });
+    return null;
+}
+
+function estimateTTSDuration(text: string): string {
+    if (!text) return '0s';
+    const totalSeconds = Math.ceil(text.length / 4);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (minutes > 0) return `~${minutes}p ${seconds}s`;
+    return `~${seconds}s`;
+}
+
 // MOCK POI data — phố Vĩnh Khánh, Quận 4, TP.HCM (fallback khi offline)
 const MOCK_POIS: POI[] = [
     { id: '1', name: 'Hẻm Bánh Tráng Nướng', description: 'Hẻm nổi tiếng với bánh tráng nướng giòn rụm, được phủ đầy trứng cút, tôm khô và các loại topping. Một trong những món ăn đường phố đặc trưng của phố Vĩnh Khánh.', latitude: 10.7550, longitude: 106.7035, geofence_radius: 40, category: 'food', qr_code_data: 'BCSD-POI-001' },
@@ -78,7 +98,7 @@ export default function MapExplore() {
     const [narrationData, setNarrationData] = useState<{ poi: POI; media: Media | null; partners: Partner[] } | null>(null);
     const [isRecenterRequested, setIsRecenterRequested] = useState(false);
 
-    const { position, permissionStatus } = useGeolocation();
+    const { position, permissionStatus, setMockLocation, isMocking } = useGeolocation();
 
     // Fetch POIs từ backend khi có vị trí GPS
     useEffect(() => {
@@ -121,11 +141,14 @@ export default function MapExplore() {
     });
 
     const handlePOIMarkerClick = useCallback((poi: POI) => {
-        triggerNarration(poi, 'AUTO');
+        unlockAudioAndTTS();
+        // Sử dụng 'QR' trigger type để bypass anti-spam khi click thủ công
+        triggerNarration(poi, 'QR');
     }, [triggerNarration]);
 
     const handleQRSuccess = useCallback((poi: POI) => {
         setShowQR(false);
+        unlockAudioAndTTS();
         triggerNarration(poi, 'QR');
     }, [triggerNarration]);
 
@@ -158,6 +181,9 @@ export default function MapExplore() {
                         <RecenterMap lat={position.lat} lng={position.lng} />
                     )}
 
+                    {/* Enable Map Click to mock GPS */}
+                    <MapClickInterceptor onMapClick={setMockLocation} />
+
                     {/* Current user location */}
                     {position && (
                         <>
@@ -182,15 +208,24 @@ export default function MapExplore() {
                             icon={getPOIIcon(poi.category)}
                             eventHandlers={{ click: () => handlePOIMarkerClick(poi) }}
                         >
-                            <Popup>
+                            <Popup minWidth={220} maxWidth={300}>
                                 <div className="text-sm font-semibold">{poi.name}</div>
-                                <div className="text-xs text-slate-500 mt-0.5">{poi.description.slice(0, 60)}...</div>
-                                <button
-                                    onClick={() => handlePOIMarkerClick(poi)}
-                                    className="mt-2 px-3 py-1 bg-primary text-white rounded-full text-xs font-bold"
-                                >
-                                    {t('map.listenNarration')}
-                                </button>
+                                <div className="text-xs text-slate-600 mt-1 leading-relaxed line-clamp-4">{poi.description.slice(0, 150)}{poi.description.length > 150 ? '...' : ''}</div>
+                                <div className="mt-2 text-[10px] text-primary font-bold bg-primary\/10 w-fit px-2 py-0.5 rounded-full inline-block">
+                                    {poi.category === 'food' ? t('tour.categoryFood', { defaultValue: 'Ẩm thực' }) : t('tour.categoryHistorical', { defaultValue: 'Di tích' })}
+                                </div>
+                                <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
+                                    <div className="flex items-center gap-1 text-[10px] font-medium text-slate-500">
+                                        <span className="material-symbols-outlined text-[14px]">headphones</span>
+                                        {estimateTTSDuration(poi.description)}
+                                    </div>
+                                    <button
+                                        onClick={() => handlePOIMarkerClick(poi)}
+                                        className="px-3 py-1.5 bg-primary text-white rounded-full text-xs font-bold active:scale-95 transition-transform shadow-sm"
+                                    >
+                                        {t('map.listenNarration')}
+                                    </button>
+                                </div>
                             </Popup>
                             {/* Geofence visualization */}
                             <Circle
@@ -216,7 +251,7 @@ export default function MapExplore() {
                         <div>
                             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{t('map.status')}</p>
                             <h2 className="text-sm font-bold leading-tight">
-                                {permissionStatus === 'granted' ? t('map.recording') : permissionStatus === 'denied' ? t('map.gpsDenied') : t('map.waitingGps')}
+                                {isMocking ? t('map.recording', { defaultValue: 'Đang mock vị trí' }) : permissionStatus === 'granted' ? t('map.recording') : permissionStatus === 'denied' ? t('map.gpsDenied') : t('map.waitingGps')}
                             </h2>
                         </div>
                     </div>

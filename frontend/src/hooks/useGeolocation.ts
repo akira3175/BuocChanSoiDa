@@ -25,6 +25,7 @@ export function useGeolocation() {
     const [position, setPosition] = useState<GeoPosition | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [permissionStatus, setPermissionStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
+    const [isMocking, setIsMocking] = useState(false);
     const breadcrumbBuffer = useRef<BreadcrumbPoint[]>([]);
     const lastPositionRef = useRef<GeoPosition | null>(null);
     const watchIdRef = useRef<number | null>(null);
@@ -41,6 +42,23 @@ export function useGeolocation() {
         }
     }, []);
 
+    const setMockLocation = useCallback((lat: number, lng: number) => {
+        setIsMocking(true);
+        const newPos = { lat, lng };
+        setPosition(newPos);
+        setPermissionStatus('granted');
+        
+        const point: BreadcrumbPoint = {
+            lat: newPos.lat,
+            long: newPos.lng,
+            timestamp: new Date().toISOString(),
+        };
+        breadcrumbBuffer.current.push(point);
+        if (breadcrumbBuffer.current.length >= BATCH_SIZE) {
+            flushBreadcrumbs();
+        }
+    }, [flushBreadcrumbs]);
+
     useEffect(() => {
         if (!navigator.geolocation) {
             setError('Thiết bị không hỗ trợ GPS');
@@ -50,6 +68,8 @@ export function useGeolocation() {
 
         watchIdRef.current = navigator.geolocation.watchPosition(
             (pos) => {
+                if (isMocking) return; // Bỏ qua GPS thật nếu đang mock (click map)
+                
                 const newPos: GeoPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 setPermissionStatus('granted');
                 const last = lastPositionRef.current;
@@ -73,6 +93,7 @@ export function useGeolocation() {
                 }
             },
             (err) => {
+                if (isMocking) return;
                 setPermissionStatus('denied');
                 setError(err.message);
             },
@@ -94,17 +115,21 @@ export function useGeolocation() {
             // Flush lần cuối khi component unmount
             flushBreadcrumbs();
         };
-    }, [flushBreadcrumbs]);
+    }, [flushBreadcrumbs, isMocking]);
 
     const requestPermission = useCallback(() => {
         navigator.geolocation.getCurrentPosition(
             (pos) => {
+                if (isMocking) return;
                 setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
                 setPermissionStatus('granted');
             },
-            () => setPermissionStatus('denied')
+            () => {
+                if (isMocking) return;
+                setPermissionStatus('denied');
+            }
         );
-    }, []);
+    }, [isMocking]);
 
-    return { position, error, permissionStatus, requestPermission };
+    return { position, error, permissionStatus, requestPermission, setMockLocation, isMocking };
 }

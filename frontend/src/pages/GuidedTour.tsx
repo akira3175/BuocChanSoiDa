@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTranslation } from 'react-i18next';
@@ -86,7 +86,27 @@ function FitBounds({ points }: { points: [number, number][] }) {
     return null;
 }
 
+// Component cho phép click mock tọa độ
+function MapClickInterceptor({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
+    useMapEvents({
+        click(e) {
+            onMapClick(e.latlng.lat, e.latlng.lng);
+        }
+    });
+    return null;
+}
+
 const OFF_ROUTE_THRESHOLD_M = 100; // cảnh báo khi đi chệch >100m
+
+// Ước tính thời lượng TTS cho văn bản (trung bình 4 ký tự/giây)
+function estimateTTSDuration(text: string): string {
+    if (!text) return '0s';
+    const totalSeconds = Math.ceil(text.length / 4);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (minutes > 0) return `~${minutes}p ${seconds}s`;
+    return `~${seconds}s`;
+}
 
 type POIStatus = 'completed' | 'current' | 'upcoming';
 
@@ -110,7 +130,7 @@ export default function GuidedTour() {
     const [showReviewForm, setShowReviewForm] = useState(false);
     const [narrationData, setNarrationData] = useState<{ poi: POI; media: Media | null; partners: Partner[] } | null>(null);
 
-    const { position } = useGeolocation();
+    const { position, setMockLocation } = useGeolocation();
     const { reviews, stats, addReview } = useTourReviews(selectedTour?.id || '');
 
     const TABS = [
@@ -352,6 +372,9 @@ export default function GuidedTour() {
                                 />
                                 <FitBounds points={routePoints} />
 
+                                {/* Enable Map Click to mock GPS */}
+                                {tourStarted && <MapClickInterceptor onMapClick={setMockLocation} />}
+
                                 {/* Route Polyline */}
                                 <Polyline
                                     positions={routePoints}
@@ -373,9 +396,11 @@ export default function GuidedTour() {
                                             position={[tp.poi.latitude, tp.poi.longitude]}
                                             icon={createTourPOIIcon(index, status)}
                                         >
-                                            <Popup>
+                                            <Popup minWidth={200} maxWidth={280}>
                                                 <div className="text-sm font-semibold">{tp.poi.name}</div>
-                                                <div className="text-xs text-slate-500 mt-0.5">{tp.poi.description.slice(0, 60)}...</div>
+                                                <div className="text-xs text-slate-600 mt-1 leading-relaxed line-clamp-3">
+                                                    {tp.poi.description.slice(0, 150)}{tp.poi.description.length > 150 ? '...' : ''}
+                                                </div>
                                             </Popup>
                                         </Marker>
                                     );
@@ -445,9 +470,15 @@ export default function GuidedTour() {
                                             </div>
                                             <p className="text-slate-500 text-xs mb-3 leading-relaxed">{tp.poi.description || t('tour.defaultDescription')}</p>
                                             <div className="flex items-center justify-between">
-                                                <span className="px-2.5 py-1 bg-primary\/10 text-primary text-[10px] font-bold rounded-full">
-                                                    {tp.poi.category === 'food' ? t('tour.categoryFood') : t('tour.categoryHistorical')}
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-2.5 py-1 bg-primary\/10 text-primary text-[10px] font-bold rounded-full">
+                                                        {tp.poi.category === 'food' ? t('tour.categoryFood') : t('tour.categoryHistorical')}
+                                                    </span>
+                                                    <span className="text-[10px] text-primary font-medium flex items-center gap-0.5 bg-primary\/5 px-2 py-1 rounded-full border border-primary\/10">
+                                                        <span className="material-symbols-outlined text-[12px]">headphones</span>
+                                                        {estimateTTSDuration(tp.poi.description)}
+                                                    </span>
+                                                </div>
                                                 {distToPOI !== null && (
                                                     <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5">
                                                         <span className="material-symbols-outlined text-[10px]">location_on</span>
@@ -458,9 +489,17 @@ export default function GuidedTour() {
                                         </div>
                                     ) : (
                                         <div className="flex items-center justify-between pb-5">
-                                            <h4 className={`font-semibold text-sm ${status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                                                {index + 1}. {tp.poi.name}
-                                            </h4>
+                                            <div className="flex flex-col">
+                                                <h4 className={`font-semibold text-sm ${status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                                                    {index + 1}. {tp.poi.name}
+                                                </h4>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="flex items-center gap-0.5 text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">
+                                                        <span className="material-symbols-outlined text-[10px]">headphones</span>
+                                                        {estimateTTSDuration(tp.poi.description)}
+                                                    </span>
+                                                </div>
+                                            </div>
                                             <div className="flex items-center gap-2">
                                                 {distToPOI !== null && status === 'upcoming' && (
                                                     <span className="text-[10px] text-slate-300 font-medium">{distToPOI}m</span>
