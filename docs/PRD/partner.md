@@ -27,3 +27,47 @@ Chủ doanh nghiệp, chuyên viên quản lý cơ sở kinh doanh lân cận ho
 - **Sáng sủa, thân thiện thiết bị di động:** Giao diện Dashboard cần tối giản, số liệu trực quan, phục vụ tốt cho đối tượng kinh doanh không rành công nghệ.
 - **Quy trình xét duyệt chuẩn hóa:** Nhất quán quy trình trạng thái (Pending Approval -> Active) minh bạch cho các doanh nghiệp lần đầu tham gia.
 - **Bảo mật và riêng tư:** Dữ liệu kinh doanh và chuyển đổi khách hàng chỉ hiển thị và báo cáo độc quyền cho chính đối tác đó.
+
+## 5. Use Case & Activity Diagram
+
+### 5.1 Use Case Diagram (Partner)
+Các chức năng chính mà đối tác có thể thực hiện trên Portal.
+
+```mermaid
+flowchart LR
+    Partner([Đối tác Kinh doanh])
+    
+    UC1(Cập nhật Thông tin cơ sở)
+    UC2(Cập nhật Menu / Sản phẩm)
+    UC3(Upload Audio giới thiệu)
+    UC4(Cấu hình Ngôn ngữ / Giọng đọc)
+    UC5(Bật / Tắt trạng thái hiển thị)
+    UC6(Xem Báo cáo Tổng quan)
+    
+    Partner --> UC1
+    Partner --> UC2
+    Partner --> UC3
+    Partner --> UC4
+    Partner --> UC5
+    Partner --> UC6
+```
+
+### 5.2 Activity Diagram (Partner: Upload Media & Monitor)
+Luồng hoạt động tải lên file âm thanh và theo dõi thống kê.
+
+```mermaid
+flowchart TD
+    Start([Bắt đầu]) --> Login[Đăng nhập Partner Portal]
+    Login --> Dashboard[Hiển thị Dashboard Dashboard]
+    
+    Dashboard --> Action{Hành động?}
+    Action -- Quản lý Media --> UploadFile[Tải file Audio lên hệ thống]
+    UploadFile --> SelectLang[Thiết lập Ngôn ngữ & Vùng giọng]
+    SelectLang --> SubmitMedia[Lưu trạng thái Pending Approval]
+    SubmitMedia --> End([Kết thúc])
+    
+    Action -- Xem Báo cáo --> SelectTime[Lọc mốc thời gian]
+    SelectTime --> FetchData[Truy xuất Metrics Impression/Click/Call]
+    FetchData --> ShowChart[Hiển thị Biểu đồ/Thống kê]
+    ShowChart --> End
+```
