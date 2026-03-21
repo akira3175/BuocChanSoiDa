@@ -72,6 +72,9 @@ flowchart TD
     ShowChart --> End
 ```
 
+### 5.3 Activity Diagram (Partner: Register/Login & View Info)
+<img width="1431" height="1368" alt="image" src="https://github.com/user-attachments/assets/b8ad07d0-5f3d-45f3-aef1-fec54c759300" />
+
 ## 6. System Architecture Flow (Operational Flow)
 Sơ đồ luồng hệ thống cấu trúc 3 lớp, mô tả dòng chảy dữ liệu (Data Pipeline) của đối tác.
 

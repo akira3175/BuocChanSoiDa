@@ -81,6 +81,10 @@ flowchart TD
     AutoPlay --> End
 ```
 
+### 5.3 Activity Diagram (User: Init, Config Profile & QR Scan)
+<img width="1598" height="1428" alt="image" src="https://github.com/user-attachments/assets/5d565e46-59cd-4dd0-85f1-a9b69c010680" />
+
+
 ## 6. System Architecture Flow (Operational Flow)
 Sơ đồ luồng hệ thống (System Flow) dựa trên cấu trúc Client - Backend - Database, mô tả cách dữ liệu được luân chuyển.
 
