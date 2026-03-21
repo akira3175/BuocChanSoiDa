@@ -156,6 +156,13 @@ class Partner(models.Model):
         default='',
         help_text='Ví dụ: 07:00 - 22:00',
     )
+    qr_url = models.URLField(
+        'Link QR (menu / mạng xã hội)',
+        blank=True,
+        default='',
+        max_length=500,
+        help_text='URL sẽ mã hoá thành QR Code hiện trên app (ví dụ: link Google Maps, Facebook, Shopeefood...)',
+    )
     status = models.IntegerField(
         'Trạng thái',
         choices=Status.choices,

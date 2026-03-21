@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, useMapEvents } from 'react-leaflet';
+import { useLocation, useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTranslation } from 'react-i18next';
@@ -98,6 +99,10 @@ export default function MapExplore() {
     const [narrationData, setNarrationData] = useState<{ poi: POI; media: Media | null; partners: Partner[] } | null>(null);
     const [isRecenterRequested, setIsRecenterRequested] = useState(false);
 
+    // Đọc POI được truyền qua navigation state (từ QR scan ở trang khác)
+    const location = useLocation();
+    const navigate = useNavigate();
+
     const { position, permissionStatus, setMockLocation, isMocking } = useGeolocation();
 
     // Fetch POIs từ backend khi có vị trí GPS
@@ -130,6 +135,18 @@ export default function MapExplore() {
         onNarrationReady: handleNarrationReady,
         onNarrationConflict: handleNarrationConflict,
     });
+
+    // Khi navigate về /map từ QR scan (QRScanOverlay gọi navigate với state.qrPOI)
+    useEffect(() => {
+        const state = location.state as { qrPOI?: POI } | null;
+        if (state?.qrPOI) {
+            unlockAudioAndTTS();
+            triggerNarration(state.qrPOI, 'QR');
+            // Xoá state để không trigger lại khi re-render
+            navigate('/map', { replace: true, state: {} });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.state]);
 
     // Geofence engine
     useGeofence({

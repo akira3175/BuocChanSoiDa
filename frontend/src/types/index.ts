@@ -41,6 +41,7 @@ export interface Partner {
     id: string;
     business_name: string;
     intro_text?: string;
+    qr_url?: string;
     menu_details?: { must_try?: string[]; price_range?: string };
     opening_hours?: string;
     distance_meters?: number;

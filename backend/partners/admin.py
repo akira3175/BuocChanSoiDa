@@ -26,6 +26,10 @@ class PartnerAdmin(admin.ModelAdmin):
             ),
             'fields': ('intro_text',),
         }),
+        ('📱 QR Code trên App', {
+            'description': 'URL sẽ được mã hoá thành QR Code và hiển thị trên popup khi khách chạm vào card đối tác.',
+            'fields': ('qr_url',),
+        }),
         ('📋 Menu & Chi tiết', {
             'fields': ('menu_details',),
             'classes': ('collapse',),
