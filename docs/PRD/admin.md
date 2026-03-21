@@ -80,6 +80,9 @@ flowchart TD
     ActivePartner --> End
     RejectPartner --> End
 ```
+### 5.3 Sequence Diagram (Admin: Create POIs & Create/Link Partner)
+<img width="1280" height="1304" alt="image" src="https://github.com/user-attachments/assets/a18088d9-16bd-4bb5-951e-dee1e85f2a2d" />
+
 
 ## 6. System Architecture Flow (Operational Flow)
 Sơ đồ quản lý dữ liệu ứng dụng (Application Data Management) và luồng duyệt nội dung của Admin.
