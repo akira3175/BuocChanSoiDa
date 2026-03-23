@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import AppLayout from '../components/AppLayout';
 import { SettingsSkeleton, staggerStyle } from '../components/Skeleton';
 import { setPartnerAuthSession } from '../services/api';
+import { useDeviceInfo } from '../hooks/useDeviceInfo';
 import type { Language, VoiceRegion } from '../types';
 
 const LANGUAGES: { value: Language; label: string; flag: string }[] = [
@@ -19,10 +20,12 @@ export default function Settings() {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const { user, dispatch } = useApp();
+    const deviceInfo = useDeviceInfo();
     const [language, setLanguage] = useState<Language>(user?.preferred_language || 'vi');
     const [voiceRegion, setVoiceRegion] = useState<VoiceRegion>(user?.preferred_voice_region || 'mien_nam');
     const [saved, setSaved] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [showDeviceInfo, setShowDeviceInfo] = useState(false);
 
     const VOICE_REGIONS: { value: VoiceRegion; label: string; subtitle: string; icon: string }[] = [
         { value: 'mien_nam', label: t('settings.voiceSouth'), subtitle: t('settings.voiceSouthDesc'), icon: '🌴' },
@@ -150,8 +153,82 @@ export default function Settings() {
                 </div>
             </div>
 
-            {/* Partner Portal Entry */}
+            {/* Device Info Section */}
             <div className="mx-4 mt-5 animate-stagger-item" style={staggerStyle(3)}>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Thông tin thiết bị</h3>
+                <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100">
+                    <button
+                        onClick={() => setShowDeviceInfo(!showDeviceInfo)}
+                        className="w-full flex items-center justify-between p-4 tap-scale transition-all hover:bg-slate-50"
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="material-symbols-outlined text-slate-600 text-xl" style={{ fontVariationSettings: "'FILL' 0" }}>devices</span>
+                            <span className="text-sm font-semibold text-slate-700">Xem chi tiết thiết bị</span>
+                        </div>
+                        <span className={`material-symbols-outlined text-slate-400 text-lg transition-transform ${showDeviceInfo ? 'rotate-180' : ''}`} style={{ fontVariationSettings: "'FILL' 0" }}>expand_more</span>
+                    </button>
+                    
+                    {showDeviceInfo && (
+                        <div className="border-t border-slate-50 p-4 space-y-3">
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500">Device ID</span>
+                                <span className="text-xs font-mono text-slate-600">{deviceInfo.deviceId.slice(0, 20)}...</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500">Platform</span>
+                                <span className="text-xs text-slate-600">{deviceInfo.platform}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500">Browser</span>
+                                <span className="text-xs text-slate-600">{deviceInfo.userAgent.split(' ').slice(-2).join(' ')}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500">Màn hình</span>
+                                <span className="text-xs text-slate-600">{deviceInfo.screenResolution}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500">Ngôn ngữ</span>
+                                <span className="text-xs text-slate-600">{deviceInfo.language}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500">Múi giờ</span>
+                                <span className="text-xs text-slate-600">{deviceInfo.timezone}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500">Kết nối</span>
+                                <span className="text-xs text-slate-600">
+                                    {deviceInfo.onLine ? (
+                                        <span className="flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-green-500 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>wifi</span>
+                                            {deviceInfo.effectiveType || 'Online'}
+                                        </span>
+                                    ) : (
+                                        <span className="flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-rose-500 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>wifi_off</span>
+                                            Offline
+                                        </span>
+                                    )}
+                                </span>
+                            </div>
+                            {deviceInfo.memory && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-slate-500">Bộ nhớ</span>
+                                    <span className="text-xs text-slate-600">{deviceInfo.memory} GB</span>
+                                </div>
+                            )}
+                            {deviceInfo.hardwareConcurrency && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-slate-500">CPU</span>
+                                    <span className="text-xs text-slate-600">{deviceInfo.hardwareConcurrency} cores</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Partner Portal Entry */}
+            <div className="mx-4 mt-5 animate-stagger-item" style={staggerStyle(4)}>
                 <button
                     onClick={handleOpenPartnerPortal}
                     className="w-full overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-r from-orange-50 via-amber-50 to-white p-4 text-left shadow-sm transition hover:shadow-md"
@@ -170,7 +247,7 @@ export default function Settings() {
             </div>
 
             {/* Save Button */}
-            <div className="mx-4 mt-6 mb-4 animate-stagger-item" style={staggerStyle(4)}>
+            <div className="mx-4 mt-6 mb-4 animate-stagger-item" style={staggerStyle(5)}>
                 <button
                     onClick={handleSave}
                     className={`w-full py-4 rounded-2xl font-bold text-base tap-scale transition-all shadow-lg ${saved ? 'bg-green-500 text-white shadow-green-200 animate-bounce-in' : 'bg-primary text-white shadow-primary\/20 hover:shadow-xl'
