@@ -33,7 +33,8 @@ export interface Media {
     language: Language;
     voice_region: VoiceRegion;
     file_url: string;
-    media_type: 'AUDIO' | 'TTS'; // uppercase, khớp với backend TextChoices
+    tts_content?: string;             // Bản dịch từ admin (dùng cho TTS đa ngôn ngữ)
+    media_type: 'AUDIO' | 'TTS';     // uppercase, khớp với backend TextChoices
     media_type_display?: string;
 }
 

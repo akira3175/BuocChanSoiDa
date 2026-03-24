@@ -10,7 +10,7 @@ class MediaSerializer(serializers.ModelSerializer):
         model = Media
         fields = [
             'id', 'language', 'voice_region',
-            'file_url', 'media_type', 'media_type_display',
+            'file_url', 'tts_content', 'media_type', 'media_type_display',
         ]
 
 
@@ -23,7 +23,7 @@ class MediaCRUDSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'poi',
             'language', 'voice_region',
-            'file_url', 'media_type', 'media_type_display',
+            'file_url', 'tts_content', 'media_type', 'media_type_display',
             'status', 'status_display',
         ]
 

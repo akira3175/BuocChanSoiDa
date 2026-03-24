@@ -80,7 +80,16 @@ class Media(models.Model):
         'URL file âm thanh',
         blank=True,
         default='',
-        help_text='Để trống nếu loại là TTS (nội dung lấy từ POI.description).',
+        help_text='Để trống nếu loại là TTS.',
+    )
+    tts_content = models.TextField(
+        'Nội dung TTS (bản dịch)',
+        blank=True,
+        default='',
+        help_text=(
+            'Văn bản sẽ được đọc TTS. Nếu để trống, hệ thống dùng mô tả gốc của POI. '
+            'Nhấn "Tự động dịch" để tự động điền từ mô tả tiếng Việt.'
+        ),
     )
     language = models.CharField(
         'Ngôn ngữ',
