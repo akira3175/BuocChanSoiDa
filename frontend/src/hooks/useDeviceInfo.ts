@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useDeviceId } from './useDeviceId';
 import type { DeviceInfo } from '../types';

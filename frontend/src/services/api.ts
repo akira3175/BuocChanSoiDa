@@ -255,13 +255,29 @@ export const getPOIPartners = async (poiId: string): Promise<Partner[]> => {
 
 // --- Tour endpoints ---
 export const getTours = async (): Promise<Tour[]> => {
-    const { data } = await apiClient.get('/tours/');
-    // DRF pagination support: { count, next, previous, results: [...] }
-    if (Array.isArray(data)) return data as Tour[];
-    if (data && Array.isArray((data as { results?: unknown }).results)) {
-        return (data as { results: Tour[] }).results;
+    try {
+        const { data } = await apiClient.get('/tours/');
+        // DRF pagination support: { count, next, previous, results: [...] }
+        if (Array.isArray(data)) return data as Tour[];
+        if (data && Array.isArray((data as { results?: unknown }).results)) {
+            return (data as { results: Tour[] }).results;
+        }
+        return [];
+    } catch (error) {
+        // Nếu token trong localStorage không hợp lệ (vd demo token), fallback gọi public không Authorization.
+        if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+            const { data } = await axios.get(`${API_BASE_URL}/tours/`, {
+                timeout: 10000,
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (Array.isArray(data)) return data as Tour[];
+            if (data && Array.isArray((data as { results?: unknown }).results)) {
+                return (data as { results: Tour[] }).results;
+            }
+            return [];
+        }
+        throw error;
     }
-    return [];
 };
 
 export const getTourById = async (id: string): Promise<Tour> => {
