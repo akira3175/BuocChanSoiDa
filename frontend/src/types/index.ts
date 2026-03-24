@@ -141,3 +141,22 @@ export interface PartnerSignupPayload {
     first_name?: string;
     last_name?: string;
 }
+
+export interface DeviceInfo {
+    deviceId: string;
+    userAgent: string;
+    platform: string;
+    vendor?: string;
+    language: string;
+    languages: string[];
+    cookieEnabled: boolean;
+    onLine: boolean;
+    screenResolution: string;
+    colorDepth: number;
+    pixelDepth: number;
+    timezone: string;
+    connectionType?: string;
+    effectiveType?: string;
+    memory?: number;
+    hardwareConcurrency?: number;
+}

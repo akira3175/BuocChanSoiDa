@@ -54,9 +54,11 @@ function getPOIIcon(category: POI['category']) {
 }
 
 // Component con để re-center map
-function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
+function RecenterMap({ lat, lng, zoom }: { lat: number; lng: number; zoom?: number }) {
     const map = useMap();
-    useEffect(() => { map.setView([lat, lng], map.getZoom()); }, [lat, lng, map]);
+    useEffect(() => { 
+        map.setView([lat, lng], zoom ?? map.getZoom()); 
+    }, [lat, lng, zoom, map]);
     return null;
 }
 
@@ -98,6 +100,8 @@ export default function MapExplore() {
     const [searchQuery, setSearchQuery] = useState('');
     const [narrationData, setNarrationData] = useState<{ poi: POI; media: Media | null; partners: Partner[] } | null>(null);
     const [isRecenterRequested, setIsRecenterRequested] = useState(false);
+    const [selectedSearchPOI, setSelectedSearchPOI] = useState<POI | null>(null);
+    const [showSearchResults, setShowSearchResults] = useState(false);
 
     // Đọc POI được truyền qua navigation state (từ QR scan ở trang khác)
     const location = useLocation();
@@ -177,6 +181,20 @@ export default function MapExplore() {
 
     const filteredPOIs = pois.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
+    // Handle search result selection - center map on selected POI
+    const handleSearchResultClick = useCallback((poi: POI) => {
+        setSelectedSearchPOI(poi);
+        setShowSearchResults(false);
+        setSearchQuery('');
+    }, []);
+
+    // Clear search when closing results
+    const handleCloseSearchResults = useCallback(() => {
+        setShowSearchResults(false);
+        setSelectedSearchPOI(null);
+        setSearchQuery('');
+    }, []);
+
     return (
         <div className="relative flex h-dvh w-full flex-col overflow-hidden">
             {/* MAP LAYER */}
@@ -196,6 +214,11 @@ export default function MapExplore() {
                     {/* Re-center when GPS acquired or button pressed */}
                     {isRecenterRequested && position && (
                         <RecenterMap lat={position.lat} lng={position.lng} />
+                    )}
+
+                    {/* Re-center to selected search POI */}
+                    {selectedSearchPOI && (
+                        <RecenterMap lat={selectedSearchPOI.latitude} lng={selectedSearchPOI.longitude} zoom={18} />
                     )}
 
                     {/* Enable Map Click to mock GPS */}
@@ -285,11 +308,43 @@ export default function MapExplore() {
                         className="flex-1 border-none bg-transparent text-sm focus:outline-none placeholder:text-slate-400"
                         placeholder={t('map.searchPlaceholder')}
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setShowSearchResults(e.target.value.length > 0);
+                        }}
+                        onFocus={() => setShowSearchResults(searchQuery.length > 0)}
                     />
                     <div className="h-4 w-px bg-slate-200" />
                     <span className="material-symbols-outlined text-primary">mic</span>
                 </div>
+
+                {/* Search Results Panel */}
+                {showSearchResults && filteredPOIs.length > 0 && (
+                    <div className="max-h-64 w-full rounded-xl bg-white shadow-xl overflow-y-auto">
+                        {filteredPOIs.map((poi) => (
+                            <button
+                                key={poi.id}
+                                onClick={() => handleSearchResultClick(poi)}
+                                className="w-full px-4 py-3 border-b border-slate-100 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left flex items-start gap-3 last:border-b-0"
+                            >
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-sm text-slate-900 truncate">{poi.name}</p>
+                                    <p className="text-xs text-slate-500 line-clamp-2">{poi.description.slice(0, 80)}{poi.description.length > 80 ? '...' : ''}</p>
+                                </div>
+                                <span className="material-symbols-outlined text-slate-400 text-[18px] flex-shrink-0">
+                                    {poi.category === 'food' ? 'restaurant' : 'castle'}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* No search results message */}
+                {showSearchResults && filteredPOIs.length === 0 && searchQuery.length > 0 && (
+                    <div className="w-full rounded-xl bg-white shadow-xl p-4 text-center">
+                        <p className="text-sm text-slate-500">{t('map.noResults', { defaultValue: 'Không tìm thấy địa điểm nào' })}</p>
+                    </div>
+                )}
             </div>
 
             {/* FAB STACK */}
