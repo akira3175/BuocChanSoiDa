@@ -62,6 +62,10 @@ export default function Settings() {
         navigate('/', { replace: true });
     };
 
+    const handleOpenInvoice = () => {
+        navigate('/invoice');
+    };
+
     if (loading) {
         return (
             <AppLayout title={t('settings.title')}>
@@ -246,8 +250,26 @@ export default function Settings() {
                 </button>
             </div>
 
+            <div className="mx-4 mt-4 animate-stagger-item" style={staggerStyle(5)}>
+                <button
+                    onClick={handleOpenInvoice}
+                    className="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:shadow-md"
+                >
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Thanh toán</p>
+                            <h3 className="mt-1 text-sm font-bold text-slate-900">Xem hóa đơn</h3>
+                            <p className="mt-1 text-xs text-slate-500">Đặt món ăn</p>
+                        </div>
+                        <div className="flex size-10 items-center justify-center rounded-full bg-slate-900 text-white">
+                            <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>receipt_long</span>
+                        </div>
+                    </div>
+                </button>
+            </div>
+
             {/* Save Button */}
-            <div className="mx-4 mt-6 mb-4 animate-stagger-item" style={staggerStyle(5)}>
+            <div className="mx-4 mt-6 mb-4 animate-stagger-item" style={staggerStyle(6)}>
                 <button
                     onClick={handleSave}
                     className={`w-full py-4 rounded-2xl font-bold text-base tap-scale transition-all shadow-lg ${saved ? 'bg-green-500 text-white shadow-green-200 animate-bounce-in' : 'bg-primary text-white shadow-primary\/20 hover:shadow-xl'

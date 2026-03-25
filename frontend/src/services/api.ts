@@ -15,6 +15,17 @@ import type {
     PartnerAuthUser,
 } from '../types';
 
+export interface Invoice {
+    id: string;
+    reason: string;
+    amount: number;
+    status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+    transaction_code: string;
+    paid_at: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 const apiClient = axios.create({
@@ -208,6 +219,38 @@ export const getApiErrorMessage = (error: unknown, fallback = 'Có lỗi xảy r
     }
 
     return fallback;
+};
+
+// --- Payment / Invoice endpoints ---
+export const createInvoice = async (amount: number): Promise<Invoice> => {
+    const { data } = await apiClient.post<Invoice>('/payments/invoices/', { amount });
+    return data;
+};
+
+export const getInvoiceById = async (invoiceId: string): Promise<Invoice> => {
+    const { data } = await apiClient.get<Invoice>(`/payments/invoices/${invoiceId}/`);
+    return data;
+};
+
+export const getInvoices = async (): Promise<Invoice[]> => {
+    const { data } = await apiClient.get<Invoice[]>('/payments/invoices/');
+    return data;
+};
+
+export const paypalCreateOrder = async (invoiceId: string): Promise<string> => {
+    const { data } = await apiClient.post<{ id: string }>(
+        '/payments/paypal/create-order/',
+        { invoiceId }
+    );
+    return data.id;
+};
+
+export const paypalCaptureOrder = async (orderId: string, invoiceId?: string): Promise<unknown> => {
+    const { data } = await apiClient.post(
+        `/payments/paypal/capture-order/${orderId}/`,
+        invoiceId ? { invoiceId } : {}
+    );
+    return data;
 };
 
 // --- POI endpoints ---

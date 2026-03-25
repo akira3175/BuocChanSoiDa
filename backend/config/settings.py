@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'tours.apps.ToursConfig',
     'users.apps.UsersConfig',
     'analytics.apps.AnalyticsConfig',
+    'payments.apps.PaymentsConfig',
 ]
 
 MIDDLEWARE = [
@@ -190,5 +191,20 @@ if CLOUDINARY_URL:
         }
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+
+# VNPay configuration
+VNPAY_TMN_CODE = os.getenv('VNPAY_TMN_CODE', '')
+VNPAY_HASH_SECRET = os.getenv('VNPAY_HASH_SECRET', '')
+VNPAY_PAY_URL = os.getenv('VNPAY_PAY_URL', 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html')
+VNPAY_RETURN_URL = os.getenv('VNPAY_RETURN_URL', 'http://localhost:8000/api/payments/vnpay-return/')
+VNPAY_IPN_URL = os.getenv('VNPAY_IPN_URL', 'http://localhost:8000/api/payments/vnpay-ipn/')
+VNPAY_FRONTEND_RETURN_URL = os.getenv('VNPAY_FRONTEND_RETURN_URL', 'http://localhost:5173/payment/vnpay-return')
+
+# PayPal configuration
+PAYPAL_CLIENT_ID = os.getenv('PAYPAL_CLIENT_ID', '')
+PAYPAL_SECRET = os.getenv('PAYPAL_SECRET', '')
+PAYPAL_BASE = os.getenv('PAYPAL_BASE', 'https://api-m.sandbox.paypal.com')
+
 
 
