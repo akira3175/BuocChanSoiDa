@@ -41,15 +41,13 @@ export interface Media {
 export interface Partner {
     id: string;
     business_name: string;
+    address?: string;
     intro_text?: string;
     qr_url?: string;
     menu_details?: { must_try?: string[]; price_range?: string };
     opening_hours?: string;
     status?: number;
     poi?: number | string | null;
-    distance_meters?: number;
-    avg_price?: number;
-    image_url?: string;
 }
 
 export interface Tour {

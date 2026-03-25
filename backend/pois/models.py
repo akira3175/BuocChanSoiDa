@@ -166,6 +166,12 @@ class Partner(models.Model):
         blank=True,
     )
     business_name = models.CharField('Tên cơ sở', max_length=255)
+    address = models.TextField(
+        'Địa chỉ',
+        blank=True,
+        default='',
+        help_text='Địa chỉ cơ sở đối tác.',
+    )
     intro_text = models.TextField(
         'Đoạn giới thiệu TTS',
         blank=True,

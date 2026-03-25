@@ -152,6 +152,7 @@ class PartnerProfileView(generics.RetrieveUpdateAPIView):
                 return Partner.objects.create(
                     user=user,
                     business_name=business_name,
+                    address=self.request.data.get('address', '') or '',
                     intro_text=self.request.data.get('intro_text', '') or '',
                     opening_hours=self.request.data.get('opening_hours', '') or '',
                     qr_url=self.request.data.get('qr_url', '') or '',

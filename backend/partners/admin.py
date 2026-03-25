@@ -6,18 +6,18 @@ from .models import Partner
 @admin.register(Partner)
 class PartnerAdmin(admin.ModelAdmin):
     list_display = [
-        'id', 'business_name', 'user', 'poi', 'opening_hours',
+        'id', 'business_name', 'address', 'user', 'poi', 'opening_hours',
         'has_intro_tts', 'status_badge',
     ]
     list_filter = ['status', 'poi', 'user']
-    search_fields = ['business_name', 'poi__name', 'user__email', 'user__username']
+    search_fields = ['business_name', 'address', 'poi__name', 'user__email', 'user__username']
     list_select_related = ['poi', 'user']
     list_per_page = 30
     actions = ['mark_pending_approval', 'approve_selected', 'reject_selected']
 
     fieldsets = (
         ('Thông tin cơ sở', {
-            'fields': ('user', 'poi', 'business_name', 'opening_hours', 'status'),
+            'fields': ('user', 'poi', 'business_name', 'address', 'opening_hours', 'status'),
             'description': 'Flow mới: tạo Partner trước (user), POI có thể để trống và liên kết sau.',
         }),
         ('🎙️ Nội dung TTS giới thiệu', {
@@ -39,7 +39,7 @@ class PartnerAdmin(admin.ModelAdmin):
 
     add_fieldsets = (
         ('Thông tin cơ sở', {
-            'fields': ('user', 'business_name', 'opening_hours', 'status'),
+            'fields': ('user', 'business_name', 'address', 'opening_hours', 'status'),
             'description': 'Tạo Partner trước. POI sẽ được liên kết sau khi Partner tạo POI riêng.',
         }),
         ('🎙️ Nội dung TTS giới thiệu', {

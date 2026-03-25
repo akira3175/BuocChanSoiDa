@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import AppLayout from '../components/AppLayout';
 import { getApiErrorMessage, getPartnerAccountProfile, isPartnerAuthenticated, logoutPartner, upsertPartnerAccountProfile } from '../services/api';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
@@ -14,10 +15,7 @@ interface PartnerDraft {
   introText: string;
   openingHours: string;
   mustTry: string;
-  menuHighlight: string;
-  hasAudioUpload: boolean;
-  linkedPOIs: string[];
-  isActive: boolean;
+  menuPriceRange: string;
 }
 
 interface CampaignStat {
@@ -29,17 +27,49 @@ interface CampaignStat {
 }
 
 const DEFAULT_DRAFT: PartnerDraft = {
-  businessName: 'Quán Hải Sản Ánh Trăng',
-  address: '102 Vĩnh Khánh, Phường 8, Quận 4, TP.HCM',
-  introText:
-    'Quán chuyên món hải sản nướng mộc, ghẹ rang me và lẩu Thái cay nhẹ. Không gian phù hợp cho nhóm bạn và gia đình buổi tối.',
-  openingHours: '16:00 - 23:30',
-  mustTry: 'Ghẹ rang me, Tôm tít nướng, Mực sa tế',
-  menuHighlight: 'Combo 2 người 289.000đ, Combo 4 người 539.000đ',
-  hasAudioUpload: false,
-  linkedPOIs: ['POI-001 Chợ đêm Vĩnh Khánh', 'POI-002 Hẻm Bánh Tráng Nướng'],
-  isActive: true,
+  businessName: '',
+  address: '',
+  introText: '',
+  openingHours: '',
+  mustTry: '',
+  menuPriceRange: '',
 };
+
+const QR_SCAN_PATH = '/api/pois/scan/';
+
+function getPublicBaseUrl(): string {
+  const envBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined)?.trim();
+  return (envBase && envBase.length > 0 ? envBase : window.location.origin).replace(/\/+$/, '');
+}
+
+function buildScanQrUrl(baseUrl: string, code: string): string {
+  const url = new URL(QR_SCAN_PATH, `${baseUrl}/`);
+  url.searchParams.set('code', code);
+  return url.toString();
+}
+
+function normalizeTimeValue(raw: string): string {
+  const m = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return '';
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (Number.isNaN(hh) || Number.isNaN(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) return '';
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+function parseOpeningHours(raw: string): { openAt: string; closeAt: string } {
+  const m = raw.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+  if (!m) return { openAt: '', closeAt: '' };
+  return {
+    openAt: normalizeTimeValue(m[1]),
+    closeAt: normalizeTimeValue(m[2]),
+  };
+}
+
+function buildOpeningHours(openAt: string, closeAt: string): string {
+  if (!openAt || !closeAt) return '';
+  return `${openAt} - ${closeAt}`;
+}
 
 const PARTNER_TABS: { id: PartnerTab; label: string; icon: string }[] = [
   { id: 'profile', label: 'Hồ sơ', icon: 'badge' },
@@ -79,7 +109,14 @@ export default function PartnerPortal() {
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileError, setProfileError] = useState('');
+  const [partnerPoiId, setPartnerPoiId] = useState('');
   const { isPlaying, speakTTS, pause } = useAudioPlayer();
+  const publicBaseUrl = useMemo(() => getPublicBaseUrl(), []);
+
+  const effectiveQrUrl = useMemo(() => {
+    if (!partnerPoiId) return '';
+    return buildScanQrUrl(publicBaseUrl, partnerPoiId);
+  }, [partnerPoiId, publicBaseUrl]);
 
   const stats = useMemo<CampaignStat[]>(
     () => [
@@ -115,8 +152,15 @@ export default function PartnerPortal() {
     []
   );
 
-  const handleFieldChange = (key: keyof PartnerDraft, value: string | boolean) => {
+  const handleFieldChange = (key: keyof PartnerDraft, value: string) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const openingTime = useMemo(() => parseOpeningHours(draft.openingHours), [draft.openingHours]);
+
+  const handleOpeningTimeChange = (key: 'openAt' | 'closeAt', value: string) => {
+    const next = { ...openingTime, [key]: value };
+    handleFieldChange('openingHours', buildOpeningHours(next.openAt, next.closeAt));
   };
 
   const handleSaveDraft = () => {
@@ -128,13 +172,14 @@ export default function PartnerPortal() {
 
     const payload = {
       business_name: draft.businessName,
+      address: draft.address,
       intro_text: draft.introText,
       opening_hours: draft.openingHours,
+      qr_url: effectiveQrUrl,
       menu_details: {
         must_try: mustTryList,
-        price_range: draft.menuHighlight,
+        price_range: draft.menuPriceRange,
       },
-      status: draft.isActive ? 1 : 0,
     };
 
     void (async () => {
@@ -215,19 +260,15 @@ export default function PartnerPortal() {
           status === 1 ? 'approved' : status === 2 ? 'pending' : 'needs_fix';
 
         setApprovalStatus(nextApprovalStatus);
+        setPartnerPoiId(data.poi ? String(data.poi) : '');
         setDraft((prev) => ({
           ...prev,
           businessName: data.business_name || '',
-          // backend hiện chưa có field "address", nên giữ nguyên/hoặc để trống
-          address: prev.address,
+          address: data.address || '',
           introText: data.intro_text || '',
           openingHours: data.opening_hours || '',
           mustTry: mustTryArr.join(', '),
-          menuHighlight: priceRange,
-          // UI switch hiện tại chưa map 1-1 sang BE (intro audio riêng); tạm giữ theo intro_text
-          hasAudioUpload: !(data.intro_text && data.intro_text.trim()),
-          linkedPOIs: prev.linkedPOIs,
-          isActive: status === 1,
+          menuPriceRange: priceRange,
         }));
       } catch (err) {
         if (!isPartnerAuthenticated()) {
@@ -245,7 +286,7 @@ export default function PartnerPortal() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [navigate]);
 
   const renderProfileTab = () => (
     <section className="mx-4 mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm animate-stagger-item">
@@ -278,34 +319,52 @@ export default function PartnerPortal() {
 
         <div>
           <label className="text-xs font-semibold text-slate-600">Khung giờ mở cửa</label>
-          <input
-            value={draft.openingHours}
-            onChange={(e) => handleFieldChange('openingHours', e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
-          />
-        </div>
-{/* 
-        <div className="rounded-xl border border-slate-200 p-3">
-          <p className="text-xs font-semibold text-slate-600">POI liên kết</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {draft.linkedPOIs.map((poi) => (
-              <span key={poi} className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary">
-                {poi}
-              </span>
-            ))}
+          <div className="mt-1 grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-slate-500">Giờ mở</label>
+              <input
+                type="time"
+                value={openingTime.openAt}
+                onChange={(e) => handleOpeningTimeChange('openAt', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-slate-500">Giờ đóng</label>
+              <input
+                type="time"
+                value={openingTime.closeAt}
+                onChange={(e) => handleOpeningTimeChange('closeAt', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
+              />
+            </div>
           </div>
-        </div> */}
-
-        <button
-          onClick={() => handleFieldChange('isActive', !draft.isActive)}
-          className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
-            draft.isActive
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-              : 'border-slate-300 bg-slate-50 text-slate-600'
-          }`}
-        >
-          {draft.isActive ? 'Đang hoạt động' : 'Tạm ngưng hoạt động'}
-        </button>
+          <p className="mt-1 text-[11px] text-slate-500">
+            {draft.openingHours ? `Định dạng lưu: ${draft.openingHours}` : 'Chọn đủ giờ mở và giờ đóng để lưu.'}
+          </p>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-600">POI ID (tự động cập nhật)</label>
+          <input
+            value={partnerPoiId || 'Chưa liên kết POI'}
+            readOnly
+            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-100/70 px-3 py-2 text-sm text-slate-700 outline-none"
+          />
+          <p className="mt-1 text-[11px] text-slate-500">
+            QR URL tự tạo từ POI ID theo: {publicBaseUrl}{QR_SCAN_PATH}?code=&lt;poi_id&gt;
+          </p>
+          <textarea
+            value={effectiveQrUrl || 'Chưa có POI ID để tạo QR URL. Hãy tạo/liên kết POI ở tab POI trước.'}
+            readOnly
+            rows={2}
+            className="mt-2 w-full resize-none rounded-xl border border-slate-200 bg-slate-100/70 px-3 py-2 text-xs text-slate-600 outline-none"
+          />
+          {effectiveQrUrl && (
+            <div className="mt-2 inline-flex rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+              <QRCodeSVG value={effectiveQrUrl} size={110} bgColor="#ffffff" fgColor="#0f172a" level="M" />
+            </div>
+          )}
+        </div>
 
         <div className="mt-2 rounded-xl border border-slate-100 p-3">
           <div className="flex items-center justify-between">
@@ -320,37 +379,7 @@ export default function PartnerPortal() {
             rows={4}
             className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
           />
-
-          <div className="mt-3 grid gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-600">Món nổi bật</label>
-              <input
-                value={draft.mustTry}
-                onChange={(e) => handleFieldChange('mustTry', e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-600">Combo/Menu nổi bật</label>
-              <input
-                value={draft.menuHighlight}
-                onChange={(e) => handleFieldChange('menuHighlight', e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
-              />
-            </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              onClick={() => handleFieldChange('hasAudioUpload', !draft.hasAudioUpload)}
-              className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
-                draft.hasAudioUpload
-                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                  : 'border-slate-200 bg-white text-slate-600'
-              }`}
-            >
-              {draft.hasAudioUpload ? 'Đã tải audio thu sẵn' : 'Tải audio thu sẵn'}
-            </button>
+          <div className="mt-3 grid grid-cols-1 gap-2">
             <button
               onClick={handleTestIntro}
               className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white flex items-center justify-center gap-1"
@@ -359,6 +388,26 @@ export default function PartnerPortal() {
               {isPlaying ? 'Dừng nghe' : 'Nghe thử intro'}
             </button>
           </div>
+          <div className="mt-3 grid gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Combo/Menu nổi bật</label>
+              <input
+                value={draft.mustTry}
+                onChange={(e) => handleFieldChange('mustTry', e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Mức giá</label>
+              <input
+                value={draft.menuPriceRange}
+                onChange={(e) => handleFieldChange('menuPriceRange', e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
+              />
+            </div>
+          </div>
+
+          
         </div>
       </div>
 
@@ -448,7 +497,7 @@ export default function PartnerPortal() {
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-primary/80">Kênh đối tác</p>
               <h2 className="mt-1 text-lg font-bold leading-tight text-slate-900">{draft.businessName}</h2>
-              <p className="mt-1 text-xs text-slate-500">Liên kết: Phố Vĩnh Khánh, Quận 4 </p>
+              <p className="mt-1 text-xs text-slate-500">{draft.address || 'Chưa cập nhật địa chỉ'}</p>
             </div>
             <span className={`rounded-full border px-3 py-1 text-[11px] font-bold ${statusClassName}`}>{statusLabel}</span>
           </div>
