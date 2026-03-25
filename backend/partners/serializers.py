@@ -12,7 +12,7 @@ User = get_user_model()
 class PartnerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Partner
-        fields = ['id', 'business_name', 'intro_text', 'qr_url', 'menu_details', 'opening_hours']
+        fields = ['id', 'business_name', 'address', 'intro_text', 'qr_url', 'menu_details', 'opening_hours']
 
 
 class PartnerCRUDSerializer(serializers.ModelSerializer):
@@ -22,8 +22,10 @@ class PartnerCRUDSerializer(serializers.ModelSerializer):
         model = Partner
         fields = [
             'id',
+            'user',
             'poi',
             'business_name',
+            'address',
             'intro_text',
             'qr_url',
             'menu_details',
@@ -31,6 +33,10 @@ class PartnerCRUDSerializer(serializers.ModelSerializer):
             'status',
             'status_display',
         ]
+        read_only_fields = ['user']
+        extra_kwargs = {
+            'poi': {'required': False, 'allow_null': True},
+        }
 
 
 class PartnerRegisterSerializer(serializers.ModelSerializer):
@@ -107,22 +113,31 @@ class PartnerTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 class PartnerProfileSerializer(serializers.ModelSerializer):
-    """Serializer cho xem/cập nhật profile Partner account."""
+    """
+    Serializer cho CRUD business profile của Partner.
+    Endpoint: /api/partners/account/profile/
+    """
 
-    full_name = serializers.SerializerMethodField()
+    menu_details = serializers.JSONField(required=False)
 
     class Meta:
-        model = User
+        model = Partner
         fields = [
-            'id', 'email', 'username', 'first_name', 'last_name',
-            'full_name', 'phone_number', 'device_id',
-            'preferred_language', 'preferred_voice_region',
-            'status', 'date_joined', 'last_login',
+            'id',
+            'business_name',
+            'address',
+            'intro_text',
+            'qr_url',
+            'menu_details',
+            'opening_hours',
+            'poi',
+            'status',
         ]
-        read_only_fields = ['id', 'email', 'status', 'date_joined', 'last_login']
-
-    def get_full_name(self, obj):
-        return obj.get_full_name()
+        extra_kwargs = {
+            'poi': {'required': False, 'allow_null': True},
+            'qr_url': {'required': False, 'allow_blank': True},
+            'menu_details': {'required': False},
+        }
 
 
 class PartnerChangePasswordSerializer(serializers.Serializer):

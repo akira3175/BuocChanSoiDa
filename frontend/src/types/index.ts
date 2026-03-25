@@ -33,20 +33,21 @@ export interface Media {
     language: Language;
     voice_region: VoiceRegion;
     file_url: string;
-    media_type: 'AUDIO' | 'TTS'; // uppercase, khớp với backend TextChoices
+    tts_content?: string;             // Bản dịch từ admin (dùng cho TTS đa ngôn ngữ)
+    media_type: 'AUDIO' | 'TTS';     // uppercase, khớp với backend TextChoices
     media_type_display?: string;
 }
 
 export interface Partner {
     id: string;
     business_name: string;
+    address?: string;
     intro_text?: string;
     qr_url?: string;
     menu_details?: { must_try?: string[]; price_range?: string };
     opening_hours?: string;
-    distance_meters?: number;
-    avg_price?: number;
-    image_url?: string;
+    status?: number;
+    poi?: number | string | null;
 }
 
 export interface Tour {

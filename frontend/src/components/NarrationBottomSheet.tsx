@@ -52,11 +52,21 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
 
     // Load audio khi mount (POI phase)
     useEffect(() => {
+        // TTS language code mapping
+        const langCode = media?.language;
+        const ttsLocale = {
+            vi: 'vi-VN', en: 'en-US', ja: 'ja-JP',
+            ko: 'ko-KR', zh: 'zh-CN', fr: 'fr-FR',
+            de: 'de-DE', es: 'es-ES', th: 'th-TH',
+        }[langCode ?? 'vi'] ?? 'vi-VN';
+
         if (media?.file_url) {
             load(media.file_url);
             play();
         } else {
-            speakTTS(poi.description, 'vi-VN');
+            // Ưu tiên: tts_content (đã dịch) > poi.description (tiếng Việt)
+            const textToSpeak = media?.tts_content?.trim() || poi.description;
+            speakTTS(textToSpeak, ttsLocale);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [poi.id]);
@@ -203,6 +213,28 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
                         {safePartners.map((p) => (
                             <PartnerCard key={p.id} partner={p} />
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 🌐 Bilingual Text — Văn bản gốc + Bản dịch */}
+            {media?.tts_content && media.language !== 'vi' && (
+                <div className="mx-4 mb-4 rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                    {/* Original */}
+                    <div className="bg-slate-50 p-4">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                            🇻🇳 Văn bản gốc (Tiếng Việt)
+                        </p>
+                        <p className="text-sm text-slate-600 leading-relaxed">{poi.description}</p>
+                    </div>
+                    {/* Divider */}
+                    <div className="h-px bg-slate-200" />
+                    {/* Translated */}
+                    <div className="bg-white p-4">
+                        <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                            🌐 Bản dịch ({media.language.toUpperCase()})
+                        </p>
+                        <p className="text-sm text-slate-800 leading-relaxed">{media.tts_content}</p>
                     </div>
                 </div>
             )}
