@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
-import { logoutPartner } from '../services/api';
+import { getApiErrorMessage, getPartnerAccountProfile, isPartnerAuthenticated, logoutPartner, upsertPartnerAccountProfile } from '../services/api';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import PartnerPOI from '../components/PartnerPOI';
 
 type ApprovalStatus = 'pending' | 'approved' | 'needs_fix';
-type PartnerTab = 'profile' | 'content' | 'distribution' | 'analytics';
+type PartnerTab = 'profile' | 'poi' | 'distribution' | 'analytics';
 
 interface PartnerDraft {
   businessName: string;
@@ -42,7 +43,7 @@ const DEFAULT_DRAFT: PartnerDraft = {
 
 const PARTNER_TABS: { id: PartnerTab; label: string; icon: string }[] = [
   { id: 'profile', label: 'Hồ sơ', icon: 'badge' },
-  { id: 'content', label: 'Nội dung', icon: 'mic' },
+  { id: 'poi', label: 'POI', icon: 'location_on' },
   { id: 'distribution', label: 'Phân phối', icon: 'hub' },
   { id: 'analytics', label: 'Hiệu quả', icon: 'monitoring' },
 ];
@@ -70,11 +71,14 @@ const REVIEW_TIMELINE = [
 
 export default function PartnerPortal() {
   const navigate = useNavigate();
-  const [approvalStatus] = useState<ApprovalStatus>('pending');
+  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>('pending');
   const [activeTab, setActiveTab] = useState<PartnerTab>('profile');
   const [draft, setDraft] = useState<PartnerDraft>(DEFAULT_DRAFT);
   const [savedAt, setSavedAt] = useState<string>('');
   const [loggingOut, setLoggingOut] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState('');
   const { isPlaying, speakTTS, pause } = useAudioPlayer();
 
   const stats = useMemo<CampaignStat[]>(
@@ -116,7 +120,38 @@ export default function PartnerPortal() {
   };
 
   const handleSaveDraft = () => {
-    setSavedAt(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }));
+    // gọi API CRUD profile (đồng thời "upsert" nếu chưa có partner profile)
+    const mustTryList = draft.mustTry
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const payload = {
+      business_name: draft.businessName,
+      intro_text: draft.introText,
+      opening_hours: draft.openingHours,
+      menu_details: {
+        must_try: mustTryList,
+        price_range: draft.menuHighlight,
+      },
+      status: draft.isActive ? 1 : 0,
+    };
+
+    void (async () => {
+      setSavingProfile(true);
+      setProfileError('');
+      try {
+        await upsertPartnerAccountProfile(payload);
+        setSavedAt(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }));
+      } catch (err) {
+        // giữ UX cũ: hiển thị message dưới form
+        // (không import thêm util để tránh lệch style)
+        const msg = err instanceof Error ? err.message : 'Không thể lưu hồ sơ. Vui lòng thử lại.';
+        setProfileError(msg);
+      } finally {
+        setSavingProfile(false);
+      }
+    })();
   };
 
   const handlePartnerLogout = async () => {
@@ -157,12 +192,72 @@ export default function PartnerPortal() {
       ? 'Cần chỉnh sửa'
       : 'Chờ duyệt';
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingProfile(true);
+    setProfileError('');
+
+    void (async () => {
+      try {
+        if (!isPartnerAuthenticated()) {
+          navigate('/partner/login?next=%2Fpartner', { replace: true });
+          return;
+        }
+
+        const data = await getPartnerAccountProfile();
+        if (cancelled) return;
+
+        const mustTryArr = data.menu_details?.must_try ?? [];
+        const priceRange = data.menu_details?.price_range ?? '';
+        const status = data.status;
+
+        const nextApprovalStatus: ApprovalStatus =
+          status === 1 ? 'approved' : status === 2 ? 'pending' : 'needs_fix';
+
+        setApprovalStatus(nextApprovalStatus);
+        setDraft((prev) => ({
+          ...prev,
+          businessName: data.business_name || '',
+          // backend hiện chưa có field "address", nên giữ nguyên/hoặc để trống
+          address: prev.address,
+          introText: data.intro_text || '',
+          openingHours: data.opening_hours || '',
+          mustTry: mustTryArr.join(', '),
+          menuHighlight: priceRange,
+          // UI switch hiện tại chưa map 1-1 sang BE (intro audio riêng); tạm giữ theo intro_text
+          hasAudioUpload: !(data.intro_text && data.intro_text.trim()),
+          linkedPOIs: prev.linkedPOIs,
+          isActive: status === 1,
+        }));
+      } catch (err) {
+        if (!isPartnerAuthenticated()) {
+          navigate('/partner/login?next=%2Fpartner', { replace: true });
+          return;
+        }
+
+        // Nếu chưa có partner profile, để user chỉnh form rồi lưu (endpoint PUT sẽ upsert).
+        setProfileError(getApiErrorMessage(err, 'Không thể tải hồ sơ đối tác. Vui lòng thử lại.'));
+      } finally {
+        if (!cancelled) setLoadingProfile(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const renderProfileTab = () => (
     <section className="mx-4 mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm animate-stagger-item">
-      <h3 className="text-base font-bold text-slate-900">1) Hồ sơ đối tác</h3>
-      <p className="mt-1 text-xs text-slate-500">Đăng ký/hồ sơ đối tác và liên kết khu vực hoạt động theo Partner Flow.</p>
+      <h3 className="text-base font-bold text-slate-900">1) Hồ sơ đối tác & nội dung</h3>
+      <p className="mt-1 text-xs text-slate-500">Quản lý hồ sơ doanh nghiệp và nội dung giới thiệu hiển thị trong ứng dụng.</p>
 
       <div className="mt-3 grid gap-3">
+        {loadingProfile && (
+          <div className="rounded-xl border border-slate-100 bg-white px-3 py-2 text-xs text-slate-500">
+            Đang tải hồ sơ...
+          </div>
+        )}
         <div>
           <label className="text-xs font-semibold text-slate-600">Tên thương hiệu</label>
           <input
@@ -189,7 +284,7 @@ export default function PartnerPortal() {
             className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
           />
         </div>
-
+{/* 
         <div className="rounded-xl border border-slate-200 p-3">
           <p className="text-xs font-semibold text-slate-600">POI liên kết</p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -199,7 +294,7 @@ export default function PartnerPortal() {
               </span>
             ))}
           </div>
-        </div>
+        </div> */}
 
         <button
           onClick={() => handleFieldChange('isActive', !draft.isActive)}
@@ -211,63 +306,63 @@ export default function PartnerPortal() {
         >
           {draft.isActive ? 'Đang hoạt động' : 'Tạm ngưng hoạt động'}
         </button>
-      </div>
-    </section>
-  );
 
-  const renderContentTab = () => (
-    <section className="mx-4 mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm animate-stagger-item">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-bold text-slate-900">2) Tạo nội dung giới thiệu</h3>
-        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary">Audio ưu tiên, TTS dự phòng</span>
-      </div>
+        <div className="mt-2 rounded-xl border border-slate-100 p-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-bold text-slate-900">Nội dung giới thiệu</h4>
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary">Audio ưu tiên, TTS dự phòng</span>
+          </div>
 
-      <label className="mt-4 block text-xs font-semibold text-slate-600">Script giới thiệu</label>
-      <textarea
-        value={draft.introText}
-        onChange={(e) => handleFieldChange('introText', e.target.value)}
-        rows={4}
-        className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
-      />
-
-      <div className="mt-3 grid gap-3">
-        <div>
-          <label className="text-xs font-semibold text-slate-600">Món nổi bật</label>
-          <input
-            value={draft.mustTry}
-            onChange={(e) => handleFieldChange('mustTry', e.target.value)}
+          <label className="mt-3 block text-xs font-semibold text-slate-600">Script giới thiệu</label>
+          <textarea
+            value={draft.introText}
+            onChange={(e) => handleFieldChange('introText', e.target.value)}
+            rows={4}
             className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
           />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-slate-600">Combo/Menu nổi bật</label>
-          <input
-            value={draft.menuHighlight}
-            onChange={(e) => handleFieldChange('menuHighlight', e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
-          />
+
+          <div className="mt-3 grid gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Món nổi bật</label>
+              <input
+                value={draft.mustTry}
+                onChange={(e) => handleFieldChange('mustTry', e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Combo/Menu nổi bật</label>
+              <input
+                value={draft.menuHighlight}
+                onChange={(e) => handleFieldChange('menuHighlight', e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleFieldChange('hasAudioUpload', !draft.hasAudioUpload)}
+              className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                draft.hasAudioUpload
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                  : 'border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              {draft.hasAudioUpload ? 'Đã tải audio thu sẵn' : 'Tải audio thu sẵn'}
+            </button>
+            <button
+              onClick={handleTestIntro}
+              className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white flex items-center justify-center gap-1"
+            >
+              <span className="material-symbols-outlined text-sm">{isPlaying ? 'stop_circle' : 'play_circle'}</span>
+              {isPlaying ? 'Dừng nghe' : 'Nghe thử intro'}
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button
-          onClick={() => handleFieldChange('hasAudioUpload', !draft.hasAudioUpload)}
-          className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
-            draft.hasAudioUpload
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-              : 'border-slate-200 bg-white text-slate-600'
-          }`}
-        >
-          {draft.hasAudioUpload ? 'Đã tải audio thu sẵn' : 'Tải audio thu sẵn'}
-        </button>
-        <button 
-          onClick={handleTestIntro}
-          className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white flex items-center justify-center gap-1"
-        >
-          <span className="material-symbols-outlined text-sm">{isPlaying ? 'stop_circle' : 'play_circle'}</span>
-          {isPlaying ? 'Dừng nghe' : 'Nghe thử intro'}
-        </button>
-      </div>
+      {profileError && <p className="mt-2 text-xs text-rose-600">{profileError}</p>}
     </section>
   );
 
@@ -353,7 +448,7 @@ export default function PartnerPortal() {
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-primary/80">Kênh đối tác</p>
               <h2 className="mt-1 text-lg font-bold leading-tight text-slate-900">{draft.businessName}</h2>
-              <p className="mt-1 text-xs text-slate-500">Liên kết: Phố Vĩnh Khánh, Quận 4 • 2 POI</p>
+              <p className="mt-1 text-xs text-slate-500">Liên kết: Phố Vĩnh Khánh, Quận 4 </p>
             </div>
             <span className={`rounded-full border px-3 py-1 text-[11px] font-bold ${statusClassName}`}>{statusLabel}</span>
           </div>
@@ -391,16 +486,17 @@ export default function PartnerPortal() {
         </section>
 
         {activeTab === 'profile' && renderProfileTab()}
-        {activeTab === 'content' && renderContentTab()}
+        {activeTab === 'poi' && <PartnerPOI />}
         {activeTab === 'distribution' && renderDistributionTab()}
         {activeTab === 'analytics' && renderAnalyticsTab()}
 
         <section className="mx-4 mt-4 mb-5 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm animate-stagger-item">
           <button
             onClick={handleSaveDraft}
-            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-primary-dark"
+            disabled={savingProfile}
+            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition hover:bg-primary-dark disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Lưu thay đổi đối tác
+            {savingProfile ? 'Đang lưu...' : 'Lưu thay đổi đối tác'}
           </button>
           {savedAt && <p className="mt-2 text-center text-[11px] font-medium text-emerald-600">Đã lưu lúc {savedAt}</p>}
         </section>

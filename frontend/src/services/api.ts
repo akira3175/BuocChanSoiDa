@@ -99,6 +99,8 @@ if (existingSession?.tokens.access) {
     applyAuthHeader(existingSession.tokens.access);
 }
 
+let partnerRefreshPromise: Promise<string> | null = null;
+
 // Offline mode interceptor - kiểm tra flag từ localStorage
 // Cơ chế Switch Logic: khi offline, request ghi (POST/PUT) vào SyncQueue,
 // request đọc (GET) trả về lỗi đặc biệt để caller dùng dữ liệu local
@@ -126,6 +128,96 @@ apiClient.interceptors.request.use((config) => {
     return config;
 });
 
+// --- Partner token refresh (JWT) ---
+// Trường hợp access token hết hạn/không hợp lệ nhưng refresh token còn dùng được,
+// tự động refresh và retry request đúng 1 lần.
+apiClient.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        if (!axios.isAxiosError(error)) {
+            return Promise.reject(error);
+        }
+
+        const status = error.response?.status;
+        const originalRequest = error.config as (any & { _retry?: boolean }) | undefined;
+
+        // Chỉ xử lý cho Partner auth 401
+        if (status !== 401 || !originalRequest) {
+            return Promise.reject(error);
+        }
+
+        // Tránh loop
+        if (originalRequest._retry) {
+            return Promise.reject(error);
+        }
+
+        const url = originalRequest.url || '';
+        const isRefreshCall =
+            url.includes('/partners/account/login/refresh/') ||
+            url.includes('/partners/account/logout/') ||
+            url.includes('/partners/account/login/');
+
+        if (isRefreshCall) {
+            return Promise.reject(error);
+        }
+
+        const session = getPartnerAuthSession();
+        if (!session?.tokens.refresh) {
+            setPartnerAuthSession(null);
+            return Promise.reject(error);
+        }
+
+        try {
+            if (!partnerRefreshPromise) {
+                partnerRefreshPromise = (async () => {
+                    const refreshResp = await axios.post(
+                        `${API_BASE_URL}/partners/account/login/refresh/`,
+                        { refresh: session.tokens.refresh },
+                        { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+                    );
+
+                    const newAccess: string | undefined = (refreshResp.data as any)?.access;
+                    if (!newAccess) {
+                        throw new Error('NO_NEW_ACCESS');
+                    }
+
+                    const nextSession: PartnerAuthSession = {
+                        ...session,
+                        tokens: {
+                            ...session.tokens,
+                            access: newAccess,
+                        },
+                    };
+                    setPartnerAuthSession(nextSession);
+                    return newAccess;
+                })().finally(() => {
+                    partnerRefreshPromise = null;
+                });
+            }
+
+            await partnerRefreshPromise;
+            originalRequest._retry = true;
+
+            const current = getPartnerAuthSession();
+            if (!current?.tokens.access) {
+                return Promise.reject(error);
+            }
+
+            // Gắn lại header Authorization trước khi retry
+            originalRequest.headers = {
+                ...(originalRequest.headers || {}),
+                Authorization: `Bearer ${current.tokens.access}`,
+            };
+
+            return apiClient(originalRequest);
+        } catch {
+            // Refresh thất bại: xoá session để UI chuyển về login
+            setPartnerAuthSession(null);
+            return Promise.reject(error);
+        }
+    }
+);
+
 // --- User endpoints ---
 export const initUser = async (deviceId: string): Promise<User> => {
     const { data } = await apiClient.post<User>('/users/init', { device_id: deviceId });
@@ -133,7 +225,7 @@ export const initUser = async (deviceId: string): Promise<User> => {
 };
 
 export const loginPartner = async (payload: PartnerLoginPayload): Promise<PartnerAuthSession> => {
-    const { data } = await apiClient.post<PartnerLoginResponse>('/users/login/', payload);
+    const { data } = await apiClient.post<PartnerLoginResponse>('/partners/account/login/', payload);
     const session: PartnerAuthSession = {
         user: data.user,
         tokens: {
@@ -157,7 +249,7 @@ export const loginUserAccount = async (payload: PartnerLoginPayload): Promise<Pa
 };
 
 export const signupPartner = async (payload: PartnerSignupPayload): Promise<PartnerAuthSession> => {
-    const { data } = await apiClient.post<PartnerSignupResponse>('/users/register/', payload);
+    const { data } = await apiClient.post<PartnerSignupResponse>('/partners/account/register/', payload);
     const session: PartnerAuthSession = {
         user: data.user,
         tokens: {
@@ -184,11 +276,22 @@ export const logoutPartner = async (): Promise<void> => {
     const session = getPartnerAuthSession();
     try {
         if (session?.tokens.refresh) {
-            await apiClient.post('/users/logout/', { refresh: session.tokens.refresh });
+            await apiClient.post('/partners/account/logout/', { refresh: session.tokens.refresh });
         }
     } finally {
         setPartnerAuthSession(null);
     }
+};
+
+// --- Partner business profile endpoints ---
+export const getPartnerAccountProfile = async (): Promise<Partner> => {
+    const { data } = await apiClient.get<Partner>('/partners/account/profile/');
+    return data;
+};
+
+export const upsertPartnerAccountProfile = async (payload: Partial<Partner>): Promise<Partner> => {
+    const { data } = await apiClient.put<Partner>('/partners/account/profile/', payload);
+    return data;
 };
 
 export const getApiErrorMessage = (error: unknown, fallback = 'Có lỗi xảy ra, vui lòng thử lại.'): string => {

@@ -39,7 +39,7 @@ class PartnerListCreateView(generics.ListCreateAPIView):
     _VALID_STATUS = {'0', '1', '2'}
 
     def get_queryset(self):
-        qs = Partner.objects.all().select_related('poi')
+        qs = Partner.objects.all().select_related('poi', 'user')
 
         poi_id = self.request.query_params.get('poi_id')
         status_param = self.request.query_params.get('status')
@@ -59,6 +59,16 @@ class PartnerListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(business_name__icontains=search)
 
         return qs.order_by('business_name')
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAuthenticated(), IsPartner()]
+        return [IsAdminOrReadOnly()]
+
+    def perform_create(self, serializer):
+        if Partner.objects.filter(user=self.request.user).exists():
+            raise ValidationError({'error': 'Mỗi tài khoản Partner chỉ được tạo 1 hồ sơ đối tác.'})
+        serializer.save(user=self.request.user)
 
 
 class PartnerDetailCRUDView(generics.RetrieveUpdateDestroyAPIView):
@@ -125,7 +135,33 @@ class PartnerProfileView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated, IsPartner]
 
     def get_object(self):
-        return self.request.user
+        # Partner model is linked via OneToOneField: User -> Partner (related_name='partner_profile')
+        user = self.request.user
+        try:
+            return user.partner_profile
+        except Partner.DoesNotExist:
+            # For PUT we allow "upsert" style: if partner business profile does not exist yet,
+            # create it from request.data. PATCH requires fields (especially business_name).
+            if self.request.method in ('PUT', 'PATCH'):
+                business_name = self.request.data.get('business_name')
+                if not business_name:
+                    from rest_framework.exceptions import NotFound
+
+                    raise NotFound('No Partner profile found (missing business_name).')
+
+                return Partner.objects.create(
+                    user=user,
+                    business_name=business_name,
+                    intro_text=self.request.data.get('intro_text', '') or '',
+                    opening_hours=self.request.data.get('opening_hours', '') or '',
+                    qr_url=self.request.data.get('qr_url', '') or '',
+                    menu_details=self.request.data.get('menu_details', {}) or {},
+                    status=self.request.data.get('status', Partner.Status.PENDING_APPROVAL),
+                )
+
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound('No Partner profile found.')
 
 
 class PartnerChangePasswordView(APIView):

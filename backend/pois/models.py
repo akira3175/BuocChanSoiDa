@@ -31,6 +31,15 @@ class POI(models.Model):
         default='',
         help_text='Dữ liệu được mã hoá trong QR Code tại điểm tham quan.',
     )
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='partner_poi',
+        verbose_name='Partner sở hữu',
+        help_text='Mỗi tài khoản Partner chỉ được sở hữu tối đa 1 POI.',
+    )
     status = models.IntegerField(
         'Trạng thái',
         choices=Status.choices,
@@ -139,11 +148,22 @@ class Partner(models.Model):
         ACTIVE = 1, 'Hoạt động'
         PENDING_APPROVAL = 2, 'Chờ phê duyệt'
 
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='partner_profile',
+        null=True,
+        blank=True,
+        verbose_name='Tài khoản Partner',
+        help_text='Tài khoản sở hữu hồ sơ đối tác.',
+    )
     poi = models.ForeignKey(
         POI,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name='partners',
         verbose_name='Điểm tham quan',
+        null=True,
+        blank=True,
     )
     business_name = models.CharField('Tên cơ sở', max_length=255)
     intro_text = models.TextField(
@@ -185,7 +205,9 @@ class Partner(models.Model):
         ordering = ['business_name']
 
     def __str__(self):
-        return f'{self.business_name} @ {self.poi.name}'
+        if self.poi_id:
+            return f'{self.business_name} @ {self.poi.name}'
+        return self.business_name
 
 
 class PartnerIntroMedia(models.Model):

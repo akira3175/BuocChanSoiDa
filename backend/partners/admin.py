@@ -6,18 +6,19 @@ from .models import Partner
 @admin.register(Partner)
 class PartnerAdmin(admin.ModelAdmin):
     list_display = [
-        'id', 'business_name', 'poi', 'opening_hours',
+        'id', 'business_name', 'user', 'poi', 'opening_hours',
         'has_intro_tts', 'status_badge',
     ]
-    list_filter = ['status', 'poi']
-    search_fields = ['business_name', 'poi__name']
-    list_select_related = ['poi']
+    list_filter = ['status', 'poi', 'user']
+    search_fields = ['business_name', 'poi__name', 'user__email', 'user__username']
+    list_select_related = ['poi', 'user']
     list_per_page = 30
     actions = ['mark_pending_approval', 'approve_selected', 'reject_selected']
 
     fieldsets = (
         ('Thông tin cơ sở', {
-            'fields': ('poi', 'business_name', 'opening_hours', 'status'),
+            'fields': ('user', 'poi', 'business_name', 'opening_hours', 'status'),
+            'description': 'Flow mới: tạo Partner trước (user), POI có thể để trống và liên kết sau.',
         }),
         ('🎙️ Nội dung TTS giới thiệu', {
             'description': (
@@ -35,6 +36,29 @@ class PartnerAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+    add_fieldsets = (
+        ('Thông tin cơ sở', {
+            'fields': ('user', 'business_name', 'opening_hours', 'status'),
+            'description': 'Tạo Partner trước. POI sẽ được liên kết sau khi Partner tạo POI riêng.',
+        }),
+        ('🎙️ Nội dung TTS giới thiệu', {
+            'fields': ('intro_text',),
+        }),
+        ('📱 QR Code trên App', {
+            'fields': ('qr_url',),
+        }),
+        ('📋 Menu & Chi tiết', {
+            'fields': ('menu_details',),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def get_fieldsets(self, request, obj=None):
+        # Ẩn field POI ở màn hình tạo mới Partner.
+        if obj is None:
+            return self.add_fieldsets
+        return super().get_fieldsets(request, obj)
 
     def has_intro_tts(self, obj):
         if obj.intro_text and obj.intro_text.strip():
