@@ -56,15 +56,14 @@ export function useSyncQueue() {
                 switch (item.type) {
                     case 'breadcrumb':
                         await postBreadcrumbs(
-                            item.payload.user_id as string,
-                            item.payload.points as { lat: number; lng: number; timestamp: string }[]
+                            item.payload.points as { lat: number; long: number; timestamp: string }[]
                         );
                         break;
                     case 'narration_start':
                         await startNarration({
-                            poi_id: item.payload.poi_id as string,
+                            poi: item.payload.poi_id as string,
                             start_time: item.payload.start_time as string,
-                            trigger_type: item.payload.trigger_type as 'Auto' | 'QR',
+                            trigger_type: item.payload.trigger_type as 'AUTO' | 'QR',
                         });
                         break;
                     case 'narration_end':

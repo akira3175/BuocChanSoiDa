@@ -66,6 +66,16 @@ export interface TourPOI {
     sequence_order: number;
 }
 
+export interface TourPOIGroup {
+    tour_id: string;
+    tour_name: string;
+    description?: string;
+    is_suggested: boolean;
+    estimated_duration_min?: number | null;
+    items: TourPOI[];
+    payload_bytes?: number;
+}
+
 export interface TourReview {
     id: string;
     tour_id: string;

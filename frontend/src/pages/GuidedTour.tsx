@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -12,6 +13,7 @@ import ReviewForm from '../components/ReviewForm';
 import { GuidedTourSkeleton } from '../components/Skeleton';
 import { staggerStyle } from '../components/Skeleton';
 import { getTours } from '../services/api';
+import { getOfflineToursFromPackages } from '../services/offlineStorage';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useGeofence } from '../hooks/useGeofence';
 import { useNarrationEngine } from '../hooks/useNarrationEngine';
@@ -129,6 +131,7 @@ export default function GuidedTour() {
     const [offRoute, setOffRoute] = useState(false);
     const [showReviewForm, setShowReviewForm] = useState(false);
     const [narrationData, setNarrationData] = useState<{ poi: POI; media: Media | null; partners: Partner[] } | null>(null);
+    const navigate = useNavigate();
 
     const { position, setMockLocation } = useGeolocation();
     const { reviews, stats, addReview } = useTourReviews(selectedTour?.id || '');
@@ -143,12 +146,31 @@ export default function GuidedTour() {
         const timer = setTimeout(() => {
             getTours()
                 .then((data) => {
-                    setTours(data);
-                    setSelectedTour(data[0] ?? null);
+                    if (data.length > 0) {
+                        setTours(data);
+                        setSelectedTour(data[0] ?? null);
+                        return;
+                    }
+
+                    getOfflineToursFromPackages()
+                        .then((offlineTours) => {
+                            setTours(offlineTours);
+                            setSelectedTour(offlineTours[0] ?? null);
+                        })
+                        .catch(() => {
+                            setTours([]);
+                            setSelectedTour(null);
+                        });
                 })
-                .catch(() => {
-                    setTours([]);
-                    setSelectedTour(null);
+                .catch(async () => {
+                    try {
+                        const offlineTours = await getOfflineToursFromPackages();
+                        setTours(offlineTours);
+                        setSelectedTour(offlineTours[0] ?? null);
+                    } catch {
+                        setTours([]);
+                        setSelectedTour(null);
+                    }
                 })
                 .finally(() => setLoading(false));
         }, 600);
@@ -333,7 +355,7 @@ export default function GuidedTour() {
                                 <TourCard
                                     tour={tour}
                                     isActive={selectedTour.id === tour.id}
-                                    onClick={() => { setSelectedTour(tour); setCurrentPOIIndex(0); setTourStarted(false); setShowMap(false); }}
+                                    onClick={() => navigate(`/tours/${tour.id}`)}
                                 />
                             </div>
                         ))}

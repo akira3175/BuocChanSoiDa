@@ -11,6 +11,7 @@ import { useGeofence } from '../hooks/useGeofence';
 import { useNarrationEngine } from '../hooks/useNarrationEngine';
 import { unlockAudioAndTTS } from '../hooks/useAudioPlayer';
 import { getPOIsNearMe } from '../services/api';
+import { getOfflinePOIsFromPackages } from '../services/offlineStorage';
 import NarrationBottomSheet from '../components/NarrationBottomSheet';
 import QRScanOverlay from '../components/QRScanOverlay';
 import BottomNavBar from '../components/BottomNavBar';
@@ -109,6 +110,18 @@ export default function MapExplore() {
 
     const { position, permissionStatus, setMockLocation, isMocking } = useGeolocation();
 
+    useEffect(() => {
+        const loadOfflinePois = async () => {
+            const offlinePois = await getOfflinePOIsFromPackages();
+            if (offlinePois.length > 0) {
+                setPois(offlinePois);
+                dispatch({ type: 'SET_NEARBY_POIS', payload: offlinePois });
+            }
+        };
+
+        loadOfflinePois().catch(() => { /* ignore */ });
+    }, [dispatch]);
+
     // Fetch POIs từ backend khi có vị trí GPS
     useEffect(() => {
         if (!position) return;
@@ -119,7 +132,13 @@ export default function MapExplore() {
                     dispatch({ type: 'SET_NEARBY_POIS', payload: data });
                 }
             })
-            .catch(() => { /* offline: giữ mock data */ });
+            .catch(async () => {
+                const offlinePois = await getOfflinePOIsFromPackages();
+                if (offlinePois.length > 0) {
+                    setPois(offlinePois);
+                    dispatch({ type: 'SET_NEARBY_POIS', payload: offlinePois });
+                }
+            });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [position?.lat, position?.lng]);
 
@@ -185,13 +204,6 @@ export default function MapExplore() {
     const handleSearchResultClick = useCallback((poi: POI) => {
         setSelectedSearchPOI(poi);
         setShowSearchResults(false);
-        setSearchQuery('');
-    }, []);
-
-    // Clear search when closing results
-    const handleCloseSearchResults = useCallback(() => {
-        setShowSearchResults(false);
-        setSelectedSearchPOI(null);
         setSearchQuery('');
     }, []);
 
