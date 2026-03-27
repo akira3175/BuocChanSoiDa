@@ -43,7 +43,7 @@ class POINearMeView(APIView):
 
         radius = float(request.query_params.get('radius', DEFAULT_RADIUS_M))
 
-        pois = POI.objects.filter(status=POI.Status.ACTIVE)
+        pois = POI.objects.filter(status=POI.Status.ACTIVE).prefetch_related('media')
 
         # Tính distance và lọc trong Python (feasible với số POI nhỏ < vài nghìn)
         results = []
@@ -56,7 +56,8 @@ class POINearMeView(APIView):
         results.sort(key=lambda p: p._distance)
 
         # Inject distance vào serializer
-        serializer = POIListSerializer(results, many=True)
+        # Inject context (request) to serializer for language-aware translation
+        serializer = POIListSerializer(results, many=True, context={'request': request})
         data = serializer.data
         for i, item in enumerate(data):
             item['distance'] = round(results[i]._distance, 1)
@@ -73,6 +74,10 @@ class POIDetailView(generics.RetrieveAPIView):
     queryset = POI.objects.filter(status=POI.Status.ACTIVE).prefetch_related('media', 'partners')
     serializer_class = POIDetailSerializer
     permission_classes = [AllowAny]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        return context
 
 
 class POIScanView(APIView):
@@ -101,7 +106,7 @@ class POIScanView(APIView):
                 {'error': f'Không tìm thấy điểm tham quan với mã QR: {code}'},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return Response(POIDetailSerializer(poi).data, status=status.HTTP_200_OK)
+        return Response(POIDetailSerializer(poi, context={'request': request}).data, status=status.HTTP_200_OK)
 
 
 class POIMediaView(APIView):
@@ -126,8 +131,9 @@ class POIMediaView(APIView):
         voice_region = request.query_params.get('voice_region')
         if language:
             qs = qs.filter(language=language)
-        if voice_region:
-            qs = qs.filter(voice_region=voice_region)
+        
+        # Trả về tất cả media của ngôn ngữ này. 
+        # Frontend (getPOIMedia) sẽ tự chọn bản tốt nhất (exact match voice_region -> language match).
         return Response(MediaSerializer(qs, many=True).data, status=status.HTTP_200_OK)
 
     def post(self, request, poi_id):

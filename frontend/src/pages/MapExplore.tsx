@@ -125,7 +125,12 @@ export default function MapExplore() {
     // Fetch POIs từ backend khi có vị trí GPS
     useEffect(() => {
         if (!position) return;
-        getPOIsNearMe(position.lat, position.lng)
+        getPOIsNearMe(
+            position.lat,
+            position.lng,
+            user?.preferred_language || 'vi',
+            user?.preferred_voice_region || 'mien_nam'
+        )
             .then((data) => {
                 if (data.length > 0) {
                     setPois(data);
@@ -262,14 +267,17 @@ export default function MapExplore() {
                         >
                             <Popup minWidth={220} maxWidth={300}>
                                 <div className="text-sm font-semibold">{poi.name}</div>
-                                <div className="text-xs text-slate-600 mt-1 leading-relaxed line-clamp-4">{poi.description.slice(0, 150)}{poi.description.length > 150 ? '...' : ''}</div>
+                                <div className="text-xs text-slate-600 mt-1 leading-relaxed line-clamp-4">
+                                    {(poi.translated_description || poi.description).slice(0, 150)}
+                                    {(poi.translated_description || poi.description).length > 150 ? '...' : ''}
+                                </div>
                                 <div className="mt-2 text-[10px] text-primary font-bold bg-primary\/10 w-fit px-2 py-0.5 rounded-full inline-block">
                                     {poi.category === 'food' ? t('tour.categoryFood', { defaultValue: 'Ẩm thực' }) : t('tour.categoryHistorical', { defaultValue: 'Di tích' })}
                                 </div>
                                 <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
                                     <div className="flex items-center gap-1 text-[10px] font-medium text-slate-500">
                                         <span className="material-symbols-outlined text-[14px]">headphones</span>
-                                        {estimateTTSDuration(poi.description)}
+                                        {estimateTTSDuration(poi.translated_description || poi.description)}
                                     </div>
                                     <button
                                         onClick={() => handlePOIMarkerClick(poi)}
@@ -341,7 +349,10 @@ export default function MapExplore() {
                             >
                                 <div className="flex-1 min-w-0">
                                     <p className="font-semibold text-sm text-slate-900 truncate">{poi.name}</p>
-                                    <p className="text-xs text-slate-500 line-clamp-2">{poi.description.slice(0, 80)}{poi.description.length > 80 ? '...' : ''}</p>
+                                    <p className="text-xs text-slate-500 line-clamp-2">
+                                        {(poi.translated_description || poi.description).slice(0, 80)}
+                                        {(poi.translated_description || poi.description).length > 80 ? '...' : ''}
+                                    </p>
                                 </div>
                                 <span className="material-symbols-outlined text-slate-400 text-[18px] flex-shrink-0">
                                     {poi.category === 'food' ? 'restaurant' : 'castle'}

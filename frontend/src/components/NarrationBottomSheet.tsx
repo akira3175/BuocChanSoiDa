@@ -50,15 +50,17 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
         onEnded: phase === 'poi' ? handlePOIEnded : handlePartnerEnded,
     });
 
-    // Load audio khi mount (POI phase)
+    // Load audio khi mount hoặc khi media/poi thay đổi
     useEffect(() => {
+        if (!poi) return;
+
         // TTS language code mapping
-        const langCode = media?.language;
+        const langCode = media?.language || 'vi';
         const ttsLocale = {
             vi: 'vi-VN', en: 'en-US', ja: 'ja-JP',
             ko: 'ko-KR', zh: 'zh-CN', fr: 'fr-FR',
             de: 'de-DE', es: 'es-ES', th: 'th-TH',
-        }[langCode ?? 'vi'] ?? 'vi-VN';
+        }[langCode] || 'vi-VN';
 
         if (media?.file_url) {
             load(media.file_url);
@@ -66,10 +68,11 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
         } else {
             // Ưu tiên: tts_content (đã dịch) > poi.description (tiếng Việt)
             const textToSpeak = media?.tts_content?.trim() || poi.description;
+            // Nếu có tts_content nhưng không phải bản tiếng Việt gốc, dùng ttsLocale của media
             speakTTS(textToSpeak, ttsLocale);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [poi.id]);
+    }, [poi.id, media]);
 
     // Khi chuyển sang partner phase → phát partner TTS
     useEffect(() => {
@@ -111,8 +114,8 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
                         <span className="material-symbols-outlined text-primary text-6xl" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
                     </div>
                 )}
-                <div className="flex justify-between items-start">
-                    <div>
+                <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1 mr-4">
                         <h1 className="text-[20px] font-bold text-slate-900 leading-tight">{poi.name}</h1>
                         {phase === 'partner' && partnerWithIntro ? (
                             <p className="text-sm font-medium text-orange-500 mt-1 flex items-center gap-1 animate-pulse">
@@ -126,9 +129,24 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
                             </p>
                         )}
                     </div>
-                    <button onClick={handleClose} className="p-2 rounded-full bg-primary/10 text-primary">
+                    <button onClick={handleClose} className="p-2 rounded-full bg-primary/10 text-primary flex-shrink-0">
                         <span className="material-symbols-outlined">close</span>
                     </button>
+                </div>
+
+                {/* 📝 Main Introduction Text (Translated) */}
+                <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-100">
+                    <p className="text-sm text-slate-700 leading-relaxed line-clamp-6">
+                        {media?.tts_content?.trim() || poi.description}
+                    </p>
+                    {media?.tts_content && media.language !== 'vi' && (
+                        <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[12px]">translate</span>
+                                {media.language.toUpperCase()} {t('common.translated', { defaultValue: 'Translated' })}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -217,25 +235,13 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
                 </div>
             )}
 
-            {/* 🌐 Bilingual Text — Văn bản gốc + Bản dịch */}
+            {/* 🌐 Original Text Toggle Option (optional show/hide) */}
             {media?.tts_content && media.language !== 'vi' && (
-                <div className="mx-4 mb-4 rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-                    {/* Original */}
-                    <div className="bg-slate-50 p-4">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                            🇻🇳 Văn bản gốc (Tiếng Việt)
-                        </p>
-                        <p className="text-sm text-slate-600 leading-relaxed">{poi.description}</p>
-                    </div>
-                    {/* Divider */}
-                    <div className="h-px bg-slate-200" />
-                    {/* Translated */}
-                    <div className="bg-white p-4">
-                        <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                            🌐 Bản dịch ({media.language.toUpperCase()})
-                        </p>
-                        <p className="text-sm text-slate-800 leading-relaxed">{media.tts_content}</p>
-                    </div>
+                <div className="mx-4 mb-4 rounded-xl border border-dashed border-slate-200 p-3 bg-slate-50/30">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                        🇻🇳 Văn bản gốc (Tiếng Việt)
+                    </p>
+                    <p className="text-xs text-slate-500 leading-relaxed italic line-clamp-2">{poi.description}</p>
                 </div>
             )}
 

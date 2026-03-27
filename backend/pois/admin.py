@@ -53,14 +53,18 @@ class POIAdminForm(forms.ModelForm):
 class MediaInline(admin.StackedInline):
     model = Media
     extra = 1
-    fields = ['language', 'voice_region', 'media_type', 'file_url', 'tts_content', 'status']
-    readonly_fields = ['preview_link']
+    fields = ['language', 'voice_region', 'media_type', 'file_url', 'tts_content', 'audio_player', 'status']
+    readonly_fields = ['audio_player']
 
-    def preview_link(self, obj):
+    def audio_player(self, obj):
         if obj.file_url:
-            return format_html('<a href="{}" target="_blank">▶ Nghe</a>', obj.file_url)
-        return '—'
-    preview_link.short_description = 'Nghe thử'
+            return format_html(
+                '<audio controls style="width:100%;max-width:400px"><source src="{}" type="audio/mpeg"></audio>'
+                '<br><a href="{}" target="_blank" style="font-size:12px;color:#0066cc">🔗 {}</a>',
+                obj.file_url, obj.file_url, obj.file_url[:80] + '...' if len(obj.file_url) > 80 else obj.file_url
+            )
+        return format_html('<span style="color:#999">⏳ Chưa có file TTS — sẽ tự động tạo khi lưu POI</span>')
+    audio_player.short_description = '🔊 Nghe TTS Audio'
 
 
 class PartnerInline(admin.TabularInline):
@@ -142,12 +146,12 @@ class POIAdmin(admin.ModelAdmin):
 # ─── Media Admin ─────────────────────────────────────────────────────────────
 @admin.register(Media)
 class MediaAdmin(admin.ModelAdmin):
-    list_display = ['id', 'poi', 'language_label', 'voice_region', 'media_type', 'tts_status', 'status', 'preview_link']
+    list_display = ['id', 'poi', 'language_label', 'voice_region', 'media_type', 'tts_status', 'audio_status', 'status', 'preview_link']
     list_filter = ['language', 'media_type', 'status']
     search_fields = ['poi__name']
     list_select_related = ['poi']
     list_per_page = 30
-    readonly_fields = ['preview_link', 'original_text_display']
+    readonly_fields = ['preview_link', 'original_text_display', 'audio_player']
     actions = ['auto_translate']
 
     fieldsets = (
@@ -166,10 +170,9 @@ class MediaAdmin(admin.ModelAdmin):
             ),
             'fields': ('tts_content',),
         }),
-        ('🔊 File âm thanh thu sẵn (tuỳ chọn)', {
-            'description': 'Upload file MP3 chất lượng cao. Nếu có, App ưu tiên phát file này thay vì TTS.',
-            'fields': ('file_url', 'preview_link'),
-            'classes': ('collapse',),
+        ('🔊 File TTS Audio (Cloudinary)', {
+            'description': 'File âm thanh TTS được tạo tự động khi lưu POI. App ưu tiên phát file này.',
+            'fields': ('file_url', 'audio_player'),
         }),
     )
 
@@ -192,11 +195,28 @@ class MediaAdmin(admin.ModelAdmin):
         return format_html('<span style="color:#dc3545">⛔ Chưa dịch</span>')
     tts_status.short_description = 'Nội dung TTS'
 
+    def audio_status(self, obj):
+        if obj.file_url:
+            return format_html('<span style="color:#28a745">🔊 Có file</span>')
+        return format_html('<span style="color:#999">⏳ Chưa có</span>')
+    audio_status.short_description = 'TTS Audio'
+
     def preview_link(self, obj):
         if obj.file_url:
             return format_html('<a href="{}" target="_blank">▶ Nghe</a>', obj.file_url)
         return '—'
     preview_link.short_description = 'Nghe thử'
+
+    def audio_player(self, obj):
+        if obj.file_url:
+            return format_html(
+                '<audio controls style="width:100%%;max-width:500px"><source src="{}" type="audio/mpeg"></audio>'
+                '<br><a href="{}" target="_blank" style="font-size:12px;color:#0066cc">🔗 {}</a>',
+                obj.file_url, obj.file_url,
+                obj.file_url[:80] + '...' if len(obj.file_url) > 80 else obj.file_url
+            )
+        return format_html('<span style="color:#999">⏳ Chưa có file TTS — sẽ tự động tạo khi lưu POI</span>')
+    audio_player.short_description = '🔊 Nghe TTS Audio'
 
     @admin.action(description='🌐 Tự động dịch nội dung POI sang ngôn ngữ của bản ghi')
     def auto_translate(self, request, queryset):

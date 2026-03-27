@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
-import type { User, POI, NarrationState, Partner } from '../types';
+import type { User, POI, NarrationState, Partner, Language, VoiceRegion } from '../types';
 
 interface AppState {
     user: User | null;
@@ -58,8 +58,24 @@ interface AppContextValue extends AppState {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+// Helper to get initial user from localStorage if available
+const getInitialUser = (): User | null => {
+    const lang = localStorage.getItem('bcsd_language') as Language | null;
+    const region = localStorage.getItem('bcsd_voice_region') as VoiceRegion | null;
+    
+    if (lang || region) {
+        return {
+            id: 'guest',
+            device_id: 'guest',
+            preferred_language: lang || 'vi',
+            preferred_voice_region: region || 'mien_nam',
+        };
+    }
+    return null;
+};
+
 const initialState: AppState = {
-    user: null,
+    user: getInitialUser(),
     isOnline: navigator.onLine,
     offlineReady: localStorage.getItem('bcsd_offline_mode') === 'true',
     narrationQueue: [],

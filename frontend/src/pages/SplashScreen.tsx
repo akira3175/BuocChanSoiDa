@@ -45,16 +45,30 @@ export default function SplashScreen() {
                 // Phase 1 → 2: API init user
                 try {
                     const user = await initUser(deviceId);
-                    dispatch({ type: 'SET_USER', payload: user });
+                    
+                    // Merge with localStorage preferences to prevent reset
+                    const savedLang = localStorage.getItem('bcsd_language');
+                    const savedRegion = localStorage.getItem('bcsd_voice_region');
+                    
+                    const mergedUser = {
+                        ...user,
+                        preferred_language: (savedLang as any) || user.preferred_language || 'vi',
+                        preferred_voice_region: (savedRegion as any) || user.preferred_voice_region || 'mien_nam',
+                    };
+                    
+                    dispatch({ type: 'SET_USER', payload: mergedUser });
                 } catch {
-                    // Nếu backend chưa có, dùng user giả thời gian phát triển
+                    // Nếu backend chưa có, dùng user từ localStorage hoặc mặc định
+                    const savedLang = localStorage.getItem('bcsd_language');
+                    const savedRegion = localStorage.getItem('bcsd_voice_region');
+                    
                     dispatch({
                         type: 'SET_USER',
                         payload: {
                             id: deviceId,
                             device_id: deviceId,
-                            preferred_language: 'vi',
-                            preferred_voice_region: 'mien_nam',
+                            preferred_language: (savedLang as any) || 'vi',
+                            preferred_voice_region: (savedRegion as any) || 'mien_nam',
                         },
                     });
                 }

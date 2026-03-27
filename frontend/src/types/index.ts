@@ -26,6 +26,7 @@ export interface POI {
     distance?: number; // field inject từ near-me view (mét)
     image_url?: string;
     address?: string;
+    translated_description?: string;
 }
 
 export interface Media {

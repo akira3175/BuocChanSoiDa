@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { createPartnerDemoSession, getApiErrorMessage, isPartnerAuthenticated, signupPartner } from '../services/api';
+import { getApiErrorMessage, isPartnerAuthenticated, signupPartner } from '../services/api';
 
 const resolveNextPath = (nextParam: string | null): string => {
     if (!nextParam || !nextParam.startsWith('/')) return '/partner';
@@ -30,7 +30,6 @@ export default function PartnerSignup() {
     const [showPassword, setShowPassword] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-    const [isDemoMode, setIsDemoMode] = useState(false);
 
     if (isPartnerAuthenticated()) {
         return <Navigate to={nextPath} replace />;
@@ -55,13 +54,6 @@ export default function PartnerSignup() {
             });
             navigate(nextPath, { replace: true });
         } catch (error) {
-            // Cho phép demo flow khi backend auth chưa sẵn sàng.
-            if (email.trim() && username.trim() && password.trim()) {
-                createPartnerDemoSession(email, username);
-                setIsDemoMode(true);
-                navigate(nextPath, { replace: true });
-                return;
-            }
             setErrorMessage(getApiErrorMessage(error, 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.'));
         } finally {
             setSubmitting(false);
@@ -77,11 +69,6 @@ export default function PartnerSignup() {
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">Góc đối tác</p>
                 <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Tạo tài khoản Partner</h1>
                 <p className="mt-2 text-sm text-slate-600">Đăng ký bằng email và mật khẩu để truy cập trang quản lý dành cho đối tác.</p>
-                {isDemoMode && (
-                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-                        Chế độ demo: Backend auth chưa sẵn sàng, đã tạo tài khoản tạm để vào Partner Portal.
-                    </div>
-                )}
 
                 <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
                     <label className="block">

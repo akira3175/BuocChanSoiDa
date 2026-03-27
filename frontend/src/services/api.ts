@@ -85,27 +85,6 @@ export const isPartnerAuthenticated = (): boolean => {
     return Boolean(session?.tokens.access);
 };
 
-export const createPartnerDemoSession = (email: string, username?: string): PartnerAuthSession => {
-    const normalizedEmail = email.trim().toLowerCase() || 'partner.demo@local';
-    const normalizedUsername = (username?.trim() || normalizedEmail.split('@')[0] || 'partner_demo').toLowerCase();
-
-    const session: PartnerAuthSession = {
-        user: {
-            id: `demo-${Date.now()}`,
-            email: normalizedEmail,
-            username: normalizedUsername,
-            full_name: 'Demo Partner',
-        },
-        tokens: {
-            access: `demo-access-${Date.now()}`,
-            refresh: `demo-refresh-${Date.now()}`,
-        },
-    };
-
-    setPartnerAuthSession(session);
-    return session;
-};
-
 const existingSession = getPartnerAuthSession();
 if (existingSession?.tokens.access) {
     applyAuthHeader(existingSession.tokens.access);
@@ -358,8 +337,8 @@ export const paypalCaptureOrder = async (orderId: string, invoiceId?: string): P
 };
 
 // --- POI endpoints ---
-export const getPOIsNearMe = async (lat: number, lng: number, radius = 500): Promise<POI[]> => {
-    const { data } = await apiClient.get<POI[]>('/pois/near-me', { params: { lat, lng, radius } });
+export const getPOIsNearMe = async (lat: number, lng: number, language = 'vi', voiceRegion = 'mien_nam', radius = 500): Promise<POI[]> => {
+    const { data } = await apiClient.get<POI[]>('/pois/near-me', { params: { lat, lng, radius, language, voice_region: voiceRegion } });
     return data;
 };
 
