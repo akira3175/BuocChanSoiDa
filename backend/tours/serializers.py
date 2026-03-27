@@ -22,7 +22,7 @@ class TourSerializer(serializers.ModelSerializer):
     def get_pois(self, obj):
         mappings = (
             obj.tour_pois
-            .filter(status=Tour_POI.Status.ACTIVE)
+            .filter(status=Tour_POI.Status.ACTIVE, poi__status=1)
             .select_related('poi')
             .order_by('sequence_order')
         )

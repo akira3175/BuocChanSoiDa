@@ -11,6 +11,7 @@ import './index.css';
 // Lazy load các pages (code-splitting)
 const MapExplore = lazy(() => import('./pages/MapExplore'));
 const GuidedTour = lazy(() => import('./pages/GuidedTour'));
+const TourDetail = lazy(() => import('./pages/TourDetail'));
 const OfflineDownload = lazy(() => import('./pages/OfflineDownload'));
 const Settings = lazy(() => import('./pages/Settings'));
 const UserAuth = lazy(() => import('./pages/UserAuth'));
@@ -49,6 +50,7 @@ export default function App() {
                   <Route path="/splash" element={<SplashScreen />} />
                   <Route path="/map" element={<MapExplore />} />
                   <Route path="/tours" element={<GuidedTour />} />
+                  <Route path="/tours/:tourId" element={<TourDetail />} />
                   <Route path="/offline" element={<OfflineDownload />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/invoice" element={<InvoiceDetail />} />

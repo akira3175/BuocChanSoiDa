@@ -5,6 +5,7 @@ import type {
     Media,
     Partner,
     Tour,
+    TourPOIGroup,
     TourReview,
     NarrationLog,
     NarrationStartResponse,
@@ -427,8 +428,43 @@ export const getTours = async (): Promise<Tour[]> => {
 };
 
 export const getTourById = async (id: string): Promise<Tour> => {
-    const { data } = await apiClient.get<Tour>(`/tours/${id}/`);
-    return data;
+    try {
+        const { data } = await apiClient.get<Tour>(`/tours/${id}/`);
+        return data;
+    } catch (error) {
+        // Nếu token local không hợp lệ (vd demo token), gọi lại endpoint public không Authorization.
+        if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+            const { data } = await axios.get<Tour>(`${API_BASE_URL}/tours/${id}/`, {
+                timeout: 10000,
+                headers: { 'Content-Type': 'application/json' },
+            });
+            return data;
+        }
+        throw error;
+    }
+};
+
+export const getTourPOIGroups = async (tourIds?: string[]): Promise<TourPOIGroup[]> => {
+    const params: Record<string, string> = {};
+    if (tourIds && tourIds.length > 0) {
+        params.tour_ids = tourIds.join(',');
+    }
+
+    try {
+        const { data } = await apiClient.get<TourPOIGroup[]>('/tours/tour-pois/', { params });
+        return data;
+    } catch (error) {
+        // Nếu token local không hợp lệ (vd demo token), gọi lại endpoint public không Authorization.
+        if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+            const { data } = await axios.get<TourPOIGroup[]>(`${API_BASE_URL}/tours/tour-pois/`, {
+                params,
+                timeout: 10000,
+                headers: { 'Content-Type': 'application/json' },
+            });
+            return data;
+        }
+        throw error;
+    }
 };
 
 export const getTourReviews = async (tourId: string): Promise<TourReview[]> => {

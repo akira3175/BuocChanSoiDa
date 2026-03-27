@@ -5,6 +5,7 @@ from .views import (
     TourDetailView,
     TourPOIListCreateView,
     TourPOIDetailView,
+    TourPOIGroupedView,
 )
 
 app_name = 'tours'
@@ -12,6 +13,7 @@ app_name = 'tours'
 urlpatterns = [
     path('', TourListView.as_view(), name='tour-list'),
     path('<int:pk>/', TourDetailView.as_view(), name='tour-detail'),
+    path('tour-pois/', TourPOIGroupedView.as_view(), name='tour-poi-grouped'),
     path('pois/', TourPOIListCreateView.as_view(), name='tour-poi-list'),
     path('pois/<int:pk>/', TourPOIDetailView.as_view(), name='tour-poi-detail'),
 ]
