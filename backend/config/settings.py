@@ -39,11 +39,11 @@ INSTALLED_APPS = [
     'cloudinary',
     
     # Local apps
+    'users.apps.UsersConfig',
     'core.apps.CoreConfig',
     'pois.apps.PoisConfig',
     'partners.apps.PartnersConfig',
     'tours.apps.ToursConfig',
-    'users.apps.UsersConfig',
     'analytics.apps.AnalyticsConfig',
     'payments.apps.PaymentsConfig',
 ]

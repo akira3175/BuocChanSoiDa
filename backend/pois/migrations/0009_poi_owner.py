@@ -16,7 +16,7 @@ def add_owner_column_if_missing(apps, schema_editor):
         return
 
     field = models.OneToOneField(
-        to=settings.AUTH_USER_MODEL,
+        to=User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

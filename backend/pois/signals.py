@@ -12,7 +12,10 @@ DEFAULT_LANGS = ['en', 'ja', 'ko', 'zh']
 
 
 def _translate(text: str, target_lang: str) -> str:
-    """Dịch text từ 'vi' sang target_lang bằng deep-translator."""
+    """
+    Dịch text từ 'vi' sang target_lang bằng deep-translator.
+    Yêu cầu: pip install deep-translator beautifulsoup4
+    """
     if not text or not text.strip():
         return ''
     if target_lang == 'vi':
