@@ -130,7 +130,11 @@ apiClient.interceptors.request.use((config) => {
 
     // Auth Header Logic
     const url = config.url || '';
-    const isPartnerRoute = url.includes('/partners/');
+    const isPartnerRoute = 
+        url.includes('/partners/') || 
+        url.includes('/pois/my-poi') || 
+        (url.includes('/media') && config.method?.toLowerCase() !== 'get');
+        
     if (isPartnerRoute) {
         const session = getPartnerAuthSession();
         if (session?.tokens.access) {
@@ -165,7 +169,10 @@ apiClient.interceptors.response.use(
         }
 
         const url = originalRequest.url || '';
-        const isPartnerRoute = url.includes('/partners/');
+        const isPartnerRoute = 
+            url.includes('/partners/') || 
+            url.includes('/pois/my-poi') || 
+            (url.includes('/media') && originalRequest.method?.toLowerCase() !== 'get');
 
         // Avoid refresh loop for login/refresh/logout/guest endpoints
         const isAuthRoute =

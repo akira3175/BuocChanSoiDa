@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { QRCodeSVG } from 'qrcode.react';
 import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import apiClient, { getApiErrorMessage } from '../services/api';
-import { useAudioPlayer } from '../hooks/useAudioPlayer';
-import type { Media, POI, POICategory } from '../types';
+import type { POI, POICategory } from '../types';
 
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -13,27 +13,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
-
-const LANG_LABELS: Record<string, string> = {
-  vi: 'Tiếng Việt',
-  en: 'English',
-  ja: '日本語',
-  ko: '한국어',
-  zh: '中文',
-  fr: 'Français',
-};
-
-function formatVoiceRegion(region: string): string {
-  if (!region) return 'Mặc định';
-  const map: Record<string, string> = {
-    mien_nam: 'Miền Nam',
-    mien_bac: 'Miền Bắc',
-    mien_trung: 'Miền Trung',
-    usa: 'USA',
-    uk: 'UK',
-  };
-  return map[region] || region;
-}
 
 function MapSelector({
   position,
@@ -59,17 +38,6 @@ export default function PartnerPOI() {
   const [addressText, setAddressText] = useState('');
   const [addressLoading, setAddressLoading] = useState(false);
   const [addressError, setAddressError] = useState('');
-  const { isPlaying, speakTTS, pause } = useAudioPlayer();
-  const [mediaList, setMediaList] = useState<Media[]>([]);
-  const [mediaSubmitting, setMediaSubmitting] = useState(false);
-  const [mediaForm, setMediaForm] = useState({
-    language: 'vi',
-    voice_region: 'mien_nam',
-    media_type: 'AUDIO' as 'AUDIO' | 'TTS',
-    tts_content: '',
-    file_url: '',
-    file: null as File | null,
-  });
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -79,22 +47,7 @@ export default function PartnerPOI() {
     geofence_radius: 80,
   });
 
-  const mediaByLocale = useMemo(() => {
-    const map = new Map<string, Media[]>();
-    const sorted = [...mediaList].sort((a, b) => {
-      const byLang = a.language.localeCompare(b.language);
-      if (byLang !== 0) return byLang;
-      const byVoice = (a.voice_region || '').localeCompare(b.voice_region || '');
-      if (byVoice !== 0) return byVoice;
-      return a.media_type.localeCompare(b.media_type);
-    });
-    for (const m of sorted) {
-      const key = `${m.language}|${m.voice_region || ''}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(m);
-    }
-    return Array.from(map.entries());
-  }, [mediaList]);
+
 
   useEffect(() => {
     const fetchMyPoi = async () => {
@@ -111,15 +64,8 @@ export default function PartnerPOI() {
           longitude: data.longitude,
           geofence_radius: data.geofence_radius || 50,
         });
-        try {
-          const mediaRes = await apiClient.get<Media[]>(`/pois/${data.id}/media/`);
-          setMediaList(mediaRes.data);
-        } catch {
-          setMediaList([]);
-        }
       } catch (err) {
         setPoi(null);
-        setMediaList([]);
         const status = axios.isAxiosError(err) ? err.response?.status : undefined;
         if (status === 404) {
           // Partner đã đăng nhập nhưng chưa có POI record (BE trả 404 "No POI found").
@@ -213,21 +159,9 @@ export default function PartnerPOI() {
       if (poi) {
         const { data } = await apiClient.put<POI>('/pois/my-poi/', formData);
         setPoi(data);
-        try {
-          const mediaRes = await apiClient.get<Media[]>(`/pois/${data.id}/media/`);
-          setMediaList(mediaRes.data);
-        } catch {
-          setMediaList([]);
-        }
       } else {
         const { data } = await apiClient.post<POI>('/pois/my-poi/', formData);
         setPoi(data);
-        try {
-          const mediaRes = await apiClient.get<Media[]>(`/pois/${data.id}/media/`);
-          setMediaList(mediaRes.data);
-        } catch {
-          setMediaList([]);
-        }
       }
       alert('Đã lưu POI thành công.');
     } catch (err) {
@@ -237,59 +171,9 @@ export default function PartnerPOI() {
     }
   };
 
-  const handleTestPoiDescription = () => {
-    const text = (formData.description || '').trim();
-    if (!text) return;
 
-    if (isPlaying) {
-      pause();
-    } else {
-      // Preview "intro" của POI ngay trong form bằng TTS tiếng Việt.
-      speakTTS(text, 'vi-VN');
-    }
-  };
 
-  const handleCreateMedia = async () => {
-    if (!poi) {
-      setError('Cần tạo POI thật trước khi thêm media.');
-      return;
-    }
 
-    setMediaSubmitting(true);
-    setError('');
-    try {
-      const payload = new FormData();
-      payload.append('language', mediaForm.language);
-      payload.append('voice_region', mediaForm.voice_region);
-      payload.append('media_type', mediaForm.media_type);
-      payload.append('tts_content', mediaForm.tts_content);
-      if (mediaForm.file_url) {
-        payload.append('file_url', mediaForm.file_url);
-      }
-      if (mediaForm.media_type === 'AUDIO' && mediaForm.file) {
-        payload.append('file', mediaForm.file);
-      }
-
-      await apiClient.post(`/pois/${poi.id}/media/`, payload, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const mediaRes = await apiClient.get<Media[]>(`/pois/${poi.id}/media/`);
-      setMediaList(mediaRes.data);
-      setMediaForm({
-        language: 'vi',
-        voice_region: 'mien_nam',
-        media_type: 'AUDIO',
-        tts_content: '',
-        file_url: '',
-        file: null,
-      });
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể thêm media.'));
-    } finally {
-      setMediaSubmitting(false);
-    }
-  };
 
   return (
     <section className="mx-4 mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
@@ -322,18 +206,6 @@ export default function PartnerPOI() {
               rows={3}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
             />
-
-            <button
-              type="button"
-              onClick={handleTestPoiDescription}
-              disabled={isPlaying ? false : !(formData.description || '').trim()}
-              className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {isPlaying ? 'stop_circle' : 'play_circle'}
-              </span>
-              {isPlaying ? 'Dừng nghe' : 'Nghe thử intro'}
-            </button>
           </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -406,173 +278,30 @@ export default function PartnerPOI() {
           </button>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-slate-50/40 to-white shadow-sm">
-          <div className="border-b border-slate-100 bg-white/90 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] text-slate-500">translate</span>
-              <h4 className="text-sm font-bold text-slate-900">Thuyết minh đa ngôn ngữ</h4>
+        {poi && (
+          <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm flex flex-col items-center justify-center p-6 text-center">
+            <h4 className="text-sm font-bold text-slate-900 mb-2">Mã QR Địa Điểm</h4>
+            <p className="text-xs text-slate-500 mb-6 max-w-xs">
+              Mã QR chứa đường dẫn trực tiếp đến địa điểm. Bạn có thể in ra đặt trên bàn cho du khách quét.
+            </p>
+            <div className="rounded-2xl border border-slate-200 p-4 bg-white shadow-sm">
+              <QRCodeSVG
+                value={`${window.location.origin}/map?poi=${poi.id}`}
+                size={200}
+                bgColor="#ffffff"
+                fgColor="#0f172a"
+                level="H"
+                includeMargin={false}
+              />
             </div>
-            <p className="mt-0.5 text-xs text-slate-500">Mỗi ngôn ngữ có thể có file ghi âm hoặc văn bản TTS.</p>
-          </div>
-
-          <div className="grid gap-4 p-4 lg:grid-cols-[320px,1fr]">
-            <div className="rounded-xl border border-dashed border-slate-200 bg-white/80 p-3">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Thêm nội dung mới</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600">Ngôn ngữ</label>
-                  <input
-                    value={mediaForm.language}
-                    onChange={(e) => setMediaForm((prev) => ({ ...prev, language: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600">Giọng vùng</label>
-                  <input
-                    value={mediaForm.voice_region}
-                    onChange={(e) => setMediaForm((prev) => ({ ...prev, voice_region: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-3">
-                <label className="text-xs font-semibold text-slate-600">Loại</label>
-                <select
-                  value={mediaForm.media_type}
-                  onChange={(e) => setMediaForm((prev) => ({ ...prev, media_type: e.target.value as 'AUDIO' | 'TTS' }))}
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
-                >
-                  <option value="AUDIO">File âm thanh</option>
-                  <option value="TTS">Đọc TTS từ văn bản</option>
-                </select>
-              </div>
-
-              {mediaForm.media_type === 'TTS' && (
-                <div className="mt-3">
-                  <label className="text-xs font-semibold text-slate-600">Văn bản</label>
-                  <textarea
-                    value={mediaForm.tts_content}
-                    onChange={(e) => setMediaForm((prev) => ({ ...prev, tts_content: e.target.value }))}
-                    rows={3}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
-                  />
-                </div>
-              )}
-
-              {mediaForm.media_type === 'AUDIO' && (
-                <div className="mt-3 grid gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600">Chọn file</label>
-                    <input
-                      type="file"
-                      accept="audio/*"
-                      onChange={(e) => setMediaForm((prev) => ({ ...prev, file: e.target.files?.[0] ?? null }))}
-                      className="mt-1 block w-full text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600">Hoặc URL</label>
-                    <input
-                      value={mediaForm.file_url}
-                      onChange={(e) => setMediaForm((prev) => ({ ...prev, file_url: e.target.value }))}
-                      placeholder="https://..."
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={handleCreateMedia}
-                disabled={mediaSubmitting || !poi}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-slate-800 disabled:opacity-50"
-              >
-                <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                {mediaSubmitting ? 'Đang thêm…' : 'Thêm vào danh sách'}
-              </button>
-            </div>
-
-            <div className="rounded-xl border border-slate-100 bg-white/80 p-3">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Danh sách hiện có</p>
-              {mediaList.length === 0 && (
-                <p className="py-6 text-center text-sm text-slate-400">Chưa có thuyết minh nào.</p>
-              )}
-
-              <div className="space-y-3">
-                {mediaByLocale.map(([localeKey, items]) => {
-                  const [langCode, voiceRaw] = localeKey.split('|');
-                  const voiceLabel = formatVoiceRegion(voiceRaw);
-                  const langTitle = LANG_LABELS[langCode] || langCode.toUpperCase();
-                  return (
-                    <div
-                      key={localeKey}
-                      className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm ring-1 ring-slate-100/50"
-                    >
-                      <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-primary/12 px-3 py-1 text-xs font-bold text-primary">{langTitle}</span>
-                        <span className="text-slate-300">·</span>
-                        <span className="text-xs font-medium text-slate-500">{voiceLabel}</span>
-                      </div>
-                      <ul className="space-y-2">
-                        {items.map((m) => (
-                          <li
-                            key={`${m.id}`}
-                            className={`flex gap-3 rounded-xl border px-3 py-2.5 ${
-                              m.media_type === 'AUDIO'
-                                ? 'border-emerald-100 bg-emerald-50/40'
-                                : 'border-indigo-100 bg-indigo-50/35'
-                            }`}
-                          >
-                            <span
-                              className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
-                                m.media_type === 'AUDIO' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'
-                              }`}
-                            >
-                              <span className="material-symbols-outlined text-[20px]">
-                                {m.media_type === 'AUDIO' ? 'graphic_eq' : 'chat_bubble'}
-                              </span>
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span
-                                  className={`text-[10px] font-bold uppercase tracking-wide ${
-                                    m.media_type === 'AUDIO' ? 'text-emerald-700' : 'text-indigo-700'
-                                  }`}
-                                >
-                                  {m.media_type === 'AUDIO' ? 'Âm thanh' : 'TTS'}
-                                </span>
-                              </div>
-                              {m.media_type === 'AUDIO' ? (
-                                <div className="mt-1">
-                                  <p className="truncate text-xs text-slate-600" title={m.file_url}>{m.file_url || 'Chưa có link'}</p>
-                                  {m.file_url && (
-                                    <a
-                                      href={m.file_url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 underline decoration-emerald-700/30 underline-offset-2 hover:text-emerald-900"
-                                    >
-                                      <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-                                      Nghe thử
-                                    </a>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="mt-1 text-xs leading-relaxed text-slate-700">{m.tts_content || '—'}</p>
-                              )}
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="mt-4 flex flex-col items-center gap-1">
+              <p className="font-bold text-slate-800">{poi.name}</p>
+              <code className="text-[10px] text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">
+                /map?poi={poi.id}
+              </code>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { scanQRCode } from '../services/api';
+import { scanQRCode, getPOIById } from '../services/api';
 import type { POI } from '../types';
 
 interface QRScanOverlayProps {
@@ -35,7 +35,29 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
         }
 
         try {
-            const poi = await scanQRCode(decodedText);
+            let poi;
+            let poiId: string | null = null;
+
+            // Try to extract ID from URL (e.g. ?poi=8 or ?id=8)
+            try {
+                const url = new URL(decodedText);
+                poiId = url.searchParams.get('poi') || url.searchParams.get('id');
+            } catch {
+                // Try to extract from JSON (e.g. {"id": 8})
+                try {
+                    const parsed = JSON.parse(decodedText);
+                    if (parsed && parsed.id) poiId = parsed.id.toString();
+                } catch {
+                    // Fallback to raw text
+                }
+            }
+
+            if (poiId) {
+                poi = await getPOIById(poiId);
+            } else {
+                poi = await scanQRCode(decodedText);
+            }
+
             await handlePOI(poi);
         } catch {
             const mockPoi: POI = {

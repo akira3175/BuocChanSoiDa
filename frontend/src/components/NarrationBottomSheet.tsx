@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { POI, Media, Partner } from '../types';
 import PartnerCard from './PartnerCard';
@@ -22,30 +22,17 @@ const PLAYBACK_RATES = [0.8, 1, 1.5, 2];
 
 export default function NarrationBottomSheet({ poi, media, partners, onClose }: NarrationBottomSheetProps) {
     const { t } = useTranslation();
-    // Phase: 'poi' = đang phát thuyết minh POI, 'partner' = đang phát intro partner
-    const [phase, setPhase] = useState<'poi' | 'partner'>('poi');
     const accumulatedDurationRef = useRef(0);
 
     // Guard: partners luôn là array (API có thể trả về paginated object hoặc null)
     const safePartners = Array.isArray(partners) ? partners : [];
 
-    // Tìm partner đầu tiên có intro_text để phát
-    const partnerWithIntro = safePartners.find((p) => p.intro_text?.trim());
-
-    // Callback khi POI narration kết thúc
     const handlePOIEnded = useCallback((dur: number) => {
         accumulatedDurationRef.current += dur;
-        if (partnerWithIntro?.intro_text) {
-            setPhase('partner');
-        } else {
-            onClose(accumulatedDurationRef.current);
-        }
-    }, [partnerWithIntro, onClose]);
-
-    // Callback khi Partner intro kết thúc
-    const handlePartnerEnded = useCallback((dur: number) => {
-        onClose(accumulatedDurationRef.current + dur);
+        onClose(accumulatedDurationRef.current);
     }, [onClose]);
+
+
 
     const { 
         isPlaying, 
@@ -61,7 +48,7 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
         setPlaybackRate, 
         speakTTS 
     } = useAudioPlayer({
-        onEnded: phase === 'poi' ? handlePOIEnded : handlePartnerEnded,
+        onEnded: handlePOIEnded,
     });
 
     const { localUrl: poiImageUrl, isOffline: isPoiImageOffline } = useOfflineMedia(poi.image_url);
@@ -99,22 +86,7 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [poi.id, media]);
 
-    // Khi chuyển sang partner phase → phát partner TTS
-    useEffect(() => {
-        if (phase === 'partner' && partnerWithIntro?.intro_text) {
-            // TTS language code mapping cho partner
-            const langCode = media?.language || 'vi';
-            const locales: Record<string, string> = {
-                vi: 'vi-VN', en: 'en-US', ja: 'ja-JP',
-                ko: 'ko-KR', zh: 'zh-CN', fr: 'fr-FR',
-                de: 'de-DE', es: 'es-ES', th: 'th-TH',
-            };
-            const ttsLocale = locales[langCode] || 'vi-VN';
-            
-            speakTTS(partnerWithIntro.intro_text, ttsLocale);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [phase]);
+
 
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -157,17 +129,10 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
                 <div className="flex justify-between items-start mb-2">
                     <div className="flex-1 mr-4">
                         <h1 className="text-[20px] font-bold text-slate-900 leading-tight">{poi.translated_name || poi.name}</h1>
-                        {phase === 'partner' && partnerWithIntro ? (
-                            <p className="text-sm font-medium text-orange-500 mt-1 flex items-center gap-1 animate-pulse">
-                                <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>store</span>
-                                {partnerWithIntro.business_name}
-                            </p>
-                        ) : (
-                            <p className="text-sm font-medium text-primary mt-1 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm">near_me</span>
-                                {t('narration.narrationPoint')}
-                            </p>
-                        )}
+                        <p className="text-sm font-medium text-primary mt-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">near_me</span>
+                            {t('narration.narrationPoint')}
+                        </p>
                     </div>
                     <button onClick={handleClose} className="p-2 rounded-full bg-primary/10 text-primary flex-shrink-0">
                         <span className="material-symbols-outlined">close</span>
