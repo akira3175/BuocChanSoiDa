@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
 from pois.models import POI
 from django.db.models import Max
@@ -16,6 +16,18 @@ class Tour(models.Model):
     id = models.BigAutoField(primary_key=True)
     tour_name = models.CharField('Tên tour', max_length=255)
     description = models.TextField('Mô tả', blank=True, default='')
+    translated_name = models.JSONField(
+        'Tên tour (đa ngôn ngữ)',
+        default=dict,
+        blank=True,
+        help_text='JSON: {"en": "Name", "ja": "Name"}'
+    )
+    translated_description = models.JSONField(
+        'Mô tả tour (đa ngôn ngữ)',
+        default=dict,
+        blank=True,
+        help_text='JSON: {"en": "Desc", "ja": "Desc"}'
+    )
     estimated_duration_min = models.IntegerField(
         'Thời lượng ước tính (phút)',
         null=True,
@@ -118,3 +130,49 @@ class Tour_POI(models.Model):
 
     def __str__(self):
         return f'{self.tour.tour_name} - {self.poi.name} ({self.sequence_order})'
+
+
+class TourReview(models.Model):
+    """
+    Đánh giá và nhận xét của người dùng về Tour.
+    """
+    id = models.BigAutoField(primary_key=True)
+    tour = models.ForeignKey(
+        Tour,
+        on_delete=models.CASCADE,
+        related_name='reviews',
+        verbose_name='Tour'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='tour_reviews',
+        verbose_name='Người dùng'
+    )
+    rating = models.IntegerField(
+        'Đánh giá',
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text='Số sao từ 1 đến 5'
+    )
+    comment = models.TextField(
+        'Nhận xét',
+        blank=True,
+        default='',
+        help_text='Nội dung nhận xét của người dùng'
+    )
+    created_at = models.DateTimeField('Ngày tạo', auto_now_add=True)
+
+    class Meta:
+        db_table = 'tour_reviews'
+        verbose_name = 'Đánh giá Tour'
+        verbose_name_plural = 'Đánh giá Tours'
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tour', 'user'],
+                name='uniq_tour_user_review'
+            )
+        ]
+
+    def __str__(self):
+        return f'{self.user.email} - {self.tour.tour_name} ({self.rating}*)'

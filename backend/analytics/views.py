@@ -16,7 +16,7 @@ from .serializers import (
 )
 
 # Nghiệp vụ: Anti-Spam window (phút)
-ANTI_SPAM_MINUTES = 30
+ANTI_SPAM_MINUTES = 5
 
 
 # ---------------------------------------------------------------------------

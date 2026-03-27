@@ -6,11 +6,24 @@ export type TriggerType = 'AUTO' | 'QR';
 export type POICategory = 'food' | 'historical' | 'cultural' | 'scenic';
 
 export interface User {
-    id: string;
+    id: string | number;
+    email?: string;
+    username?: string;
+    full_name?: string;
     device_id: string;
     preferred_language: Language;
     preferred_voice_region: VoiceRegion;
     created_at?: string;
+}
+
+export interface UserAuthTokens {
+    access: string;
+    refresh: string;
+}
+
+export interface UserAuthSession {
+    user: User;
+    tokens: UserAuthTokens;
 }
 
 export interface POI {
@@ -26,6 +39,7 @@ export interface POI {
     distance?: number; // field inject từ near-me view (mét)
     image_url?: string;
     address?: string;
+    translated_name?: string;
     translated_description?: string;
 }
 
@@ -55,6 +69,8 @@ export interface Tour {
     id: string;
     name: string;
     description?: string;
+    translated_name?: Record<string, string>;
+    translated_description?: Record<string, string>;
     status: 0 | 1;
     is_suggested: boolean;
     estimated_duration_min?: number;
@@ -71,6 +87,8 @@ export interface TourPOIGroup {
     tour_id: string;
     tour_name: string;
     description?: string;
+    translated_name?: Record<string, string>;
+    translated_description?: Record<string, string>;
     is_suggested: boolean;
     estimated_duration_min?: number | null;
     items: TourPOI[];
@@ -79,9 +97,10 @@ export interface TourPOIGroup {
 
 export interface TourReview {
     id: string;
-    tour_id: string;
-    user_id: string;
-    user_name: string;
+    tour: string | number;
+    user: string | number;
+    user_email: string;
+    username: string;
     rating: number; // 1-5
     comment: string;
     created_at: string;

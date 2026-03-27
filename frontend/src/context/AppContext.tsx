@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
-import type { User, POI, NarrationState, Partner, Language, VoiceRegion } from '../types';
+import type { User, POI, NarrationState, Partner, Media } from '../types';
+import { getUserAuthSession, guestLogin } from '../services/api';
 
 interface AppState {
     user: User | null;
@@ -52,25 +53,26 @@ function reducer(state: AppState, action: AppAction): AppState {
 
 interface AppContextValue extends AppState {
     dispatch: React.Dispatch<AppAction>;
-    openNarration: (poi: POI, media?: undefined, partners?: Partner[]) => void;
+    openNarration: (poi: POI, media?: Media | null, partners?: Partner[]) => void;
     closeNarration: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-// Helper to get initial user from localStorage if available
-const getInitialUser = (): User | null => {
-    const lang = localStorage.getItem('bcsd_language') as Language | null;
-    const region = localStorage.getItem('bcsd_voice_region') as VoiceRegion | null;
-    
-    if (lang || region) {
-        return {
-            id: 'guest',
-            device_id: 'guest',
-            preferred_language: lang || 'vi',
-            preferred_voice_region: region || 'mien_nam',
-        };
+// Helper to generate or get device ID
+const getOrCreateDeviceId = () => {
+    let devId = localStorage.getItem('bcsd_device_id');
+    if (!devId) {
+        devId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('bcsd_device_id', devId);
     }
+    return devId;
+};
+
+// Helper to get initial user from session if available
+const getInitialUser = (): User | null => {
+    const session = getUserAuthSession();
+    if (session?.user) return session.user;
     return null;
 };
 
@@ -86,6 +88,23 @@ const initialState: AppState = {
 export function AppProvider({ children }: { children: React.ReactNode }) {
     const [state, dispatch] = useReducer(reducer, initialState);
 
+    // Auto Guest Login
+    useEffect(() => {
+        const checkAutoLogin = async () => {
+            const session = getUserAuthSession();
+            if (!session) {
+                try {
+                    const devId = getOrCreateDeviceId();
+                    const newSession = await guestLogin(devId);
+                    dispatch({ type: 'SET_USER', payload: newSession.user });
+                } catch (error) {
+                    console.error("Auto guest login failed", error);
+                }
+            }
+        };
+        checkAutoLogin();
+    }, []);
+
     // Listen for online/offline events
     useEffect(() => {
         const handleOnline = () => dispatch({ type: 'SET_ONLINE', payload: true });
@@ -98,12 +117,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    const openNarration = useCallback((poi: POI, media?: undefined, partners: Partner[] = []) => {
+    const openNarration = useCallback((poi: POI, media?: Media | null, partners: Partner[] = []) => {
         dispatch({
             type: 'SET_ACTIVE_NARRATION',
             payload: {
                 poi,
-                media,
+                media: media || undefined,
                 partners,
                 isPlaying: true,
                 currentTime: 0,

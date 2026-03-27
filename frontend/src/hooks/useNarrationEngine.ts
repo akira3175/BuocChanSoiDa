@@ -2,7 +2,8 @@ import { useCallback, useRef } from 'react';
 import type { POI, Media, Partner, Language, VoiceRegion } from '../types';
 import { startNarration, endNarration, getPOIMedia, getPOIPartners } from '../services/api';
 
-const ANTI_SPAM_MINUTES = 10;
+const ANTI_SPAM_MINUTES = 2; // Giảm xuống 2 phút để user dễ test và phù hợp thực tế quay lại địa điểm
+const LOG_PREFIX = '[NarrationEngine]';
 const LOG_KEY = 'bcsd_narration_logs';
 
 interface NarrationLogLocal {
@@ -45,45 +46,40 @@ export function useNarrationEngine({
     const currentLogIdRef = useRef<string | null>(null);
     const currentPoiRef = useRef<POI | null>(null);
 
-    /**
-     * Kiểm tra Anti-Spam: POI này đã được nghe bởi trigger Auto trong 30 phút gần đây chưa?
-     */
-    const checkAntiSpam = useCallback((poiId: string, triggerType: 'AUTO' | 'QR'): boolean => {
-        if (triggerType === 'QR') return false; // QR override: luôn phát
-        const logs = getLocalLogs();
-        const now = Date.now();
-        const recentLog = logs.find(
-            (l) =>
-                l.poi_id === poiId &&
-                l.trigger_type === 'AUTO' &&
-                now - l.start_time < ANTI_SPAM_MINUTES * 60 * 1000
-        );
-        return !!recentLog; // true = bị spam, bỏ qua
-    }, []);
+
 
     /**
-     * Trigger narration cho 1 POI
+     * Kích hoạt thuyết minh (tự động hoặc quét QR)
      */
     const triggerNarration = useCallback(
         async (poi: POI, triggerType: 'AUTO' | 'QR' = 'AUTO') => {
-            // 1. Kiểm tra Anti-Spam local (nhanh, dùng khi offline)
-            if (checkAntiSpam(poi.id, triggerType)) return;
-
-            // 2. Nếu đang phát bài khác
-            if (isPlayingRef.current) {
-                if (triggerType === 'QR') {
-                    onNarrationConflict(poi);
-                } else {
-                    onNarrationConflict(poi);
-                }
+            // 1. Kiểm tra conflict (đang phát POI khác)
+            if (isPlayingRef.current && currentPoiRef.current?.id !== poi.id) {
+                console.log(LOG_PREFIX, 'Conflict detected for:', poi.name);
+                onNarrationConflict(poi);
                 return;
             }
 
-            // 3. Bắt đầu phát
+            // 2. Kiểm tra Anti-Spam cho trigger AUTO
+            if (triggerType === 'AUTO') {
+                const lastHeard = localStorage.getItem(`bcsd_last_heard_${poi.id}`);
+                if (lastHeard) {
+                    const diff = Date.now() - parseInt(lastHeard, 10);
+                    if (diff < ANTI_SPAM_MINUTES * 60 * 1000) {
+                        console.warn(LOG_PREFIX, 'Skip auto narration (Anti-spam) for:', poi.name, 
+                            'Remaining:', Math.ceil((ANTI_SPAM_MINUTES * 60 * 1000 - diff) / 1000), 's');
+                        return;
+                    }
+                }
+            }
+
+            console.log(LOG_PREFIX, 'Triggering narration for:', poi.name, 'Type:', triggerType);
+
+            // 3. Mark as playing
             isPlayingRef.current = true;
             currentPoiRef.current = poi;
 
-            // Log start
+            // Log start to Backend
             const logEntry: NarrationLogLocal = {
                 poi_id: poi.id,
                 start_time: Date.now(),
@@ -96,33 +92,29 @@ export function useNarrationEngine({
                     start_time: new Date().toISOString(),
                     trigger_type: triggerType,
                 });
-
-                // Server trả về should_play = false → Anti-Spam blocked phía server
-                if (!response.should_play) {
-                    isPlayingRef.current = false;
-                    currentPoiRef.current = null;
-                    return;
-                }
-
                 const logId = response.log?.id;
                 logEntry.log_id = logId;
                 currentLogIdRef.current = logId ?? null;
-            } catch {
-                // Offline: lưu local để sync sau
+            } catch (err) {
+                console.warn(LOG_PREFIX, 'Backend log failed (offline?)', err);
                 currentLogIdRef.current = null;
             }
             saveLocalLog(logEntry);
 
-            // 4. Lấy media + partners song song
+            // 4. Record timestamp for anti-spam (LOCAL ONLY)
+            localStorage.setItem(`bcsd_last_heard_${poi.id}`, Date.now().toString());
+
+            // 5. Fetch Media & Partners
             const [media, partners] = await Promise.all([
                 getPOIMedia(poi.id, language, voiceRegion),
                 getPOIPartners(poi.id).catch(() => [] as Partner[]),
             ]);
 
-            // 5. Gửi lên UI để play
+            // 6. Notify UI
+            console.log(LOG_PREFIX, 'Narration ready for:', poi.name, 'Media:', media ? media.language : 'TTS (No file)');
             onNarrationReady(poi, media, partners);
         },
-        [checkAntiSpam, language, voiceRegion, onNarrationReady, onNarrationConflict]
+        [language, voiceRegion, onNarrationReady, onNarrationConflict]
     );
 
     /**

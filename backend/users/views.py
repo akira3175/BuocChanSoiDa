@@ -1,3 +1,4 @@
+import uuid
 from django.contrib.auth import get_user_model
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -11,6 +12,8 @@ from .serializers import (
     CustomTokenObtainPairSerializer,
     RegisterSerializer,
     UserProfileSerializer,
+    GuestLoginSerializer,
+    UpgradeGuestSerializer,
 )
 
 User = get_user_model()
@@ -53,6 +56,50 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     Đăng nhập bằng email + password, trả về JWT access + refresh + user info.
     """
     serializer_class = CustomTokenObtainPairSerializer
+
+
+class UpgradeGuestView(APIView):
+    """
+    POST /api/users/upgrade-guest/
+    Nâng cấp tài khoản guest thành tài khoản thường (thêm email, password).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = UpgradeGuestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        # Tùy chọn: kiểm tra xem đúng là guest không
+        if not user.email.endswith('@guest.bcsd.local'):
+            return Response(
+                {'error': 'Tài khoản này không phải là tài khoản Guest.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        new_email = serializer.validated_data['email']
+        new_password = serializer.validated_data['password']
+
+        user.email = new_email
+        user.set_password(new_password)
+        user.save()
+
+        # Generate new tokens
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            'message': 'Nâng cấp tài khoản thành công!',
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            },
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'full_name': user.get_full_name(),
+            }
+        }, status=status.HTTP_200_OK)
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -118,3 +165,54 @@ class LogoutView(APIView):
                 {'error': 'Token không hợp lệ hoặc đã hết hạn.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class GuestLoginView(APIView):
+    """
+    POST /api/users/guest-login/
+    Đăng nhập hoặc tạo mới tài khoản guest dựa vào device_id.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = GuestLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        device_id = serializer.validated_data['device_id']
+
+        # Tìm user có device_id này và email có đuôi @guest.bcsd.local
+        user = User.objects.filter(device_id=device_id, email__endswith='@guest.bcsd.local').first()
+
+        if not user:
+            # Tạo mới
+            short_uuid = uuid.uuid4().hex[:8]
+            guest_email = f"guest_{short_uuid}_{device_id[-4:]}@guest.bcsd.local"
+            guest_username = f"guest_{short_uuid}"
+            
+            # Đảm bảo email duy nhất (rất hiếm khi trùng, nhưng cứ phòng hờ)
+            while User.objects.filter(email=guest_email).exists():
+                short_uuid = uuid.uuid4().hex[:8]
+                guest_email = f"guest_{short_uuid}_{device_id[-4:]}@guest.bcsd.local"
+
+            user = User.objects.create_user(
+                username=guest_username,
+                email=guest_email,
+                password=uuid.uuid4().hex, # Mật khẩu random không ai biết, không quan trọng
+                device_id=device_id
+            )
+
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            'message': 'Đăng nhập Guest thành công!',
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            },
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'full_name': user.get_full_name(),
+                'device_id': user.device_id,
+            }
+        }, status=status.HTTP_200_OK)

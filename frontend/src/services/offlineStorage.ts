@@ -6,15 +6,22 @@ type StoredOfflinePayload = {
     pois?: POI[];
 };
 
-type StoredOfflinePackage = {
-    id: string;
-    data?: Blob;
-    payload?: StoredOfflinePayload;
-};
 
 const DB_NAME = 'bcsd_offline_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented version to add new store
 const STORE_NAME = 'offline_packages';
+const MEDIA_STORE_NAME = 'offline_media';
+
+export type StoredOfflinePackage = {
+    id: string;
+    data: Blob;
+    downloaded_at: string;
+    payload?: StoredOfflinePayload;
+    stats?: {
+        tour_pois_count: number;
+        pois_count: number;
+    };
+};
 
 function openDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
@@ -24,9 +31,109 @@ function openDB(): Promise<IDBDatabase> {
             if (!db.objectStoreNames.contains(STORE_NAME)) {
                 db.createObjectStore(STORE_NAME, { keyPath: 'id' });
             }
+            if (!db.objectStoreNames.contains(MEDIA_STORE_NAME)) {
+                db.createObjectStore(MEDIA_STORE_NAME, { keyPath: 'url' });
+            }
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
+    });
+}
+
+export async function savePackageToDB(packageId: string, data: Blob): Promise<void> {
+    const payload = await parsePayloadFromBlob(data);
+    const tourPoisCount = Array.isArray(payload?.tour_pois) ? payload?.tour_pois.length : 0;
+    const poisCount = Array.isArray(payload?.pois) ? payload?.pois.length : 0;
+
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put({
+            id: packageId,
+            data,
+            downloaded_at: new Date().toISOString(),
+            payload,
+            stats: {
+                tour_pois_count: tourPoisCount,
+                pois_count: poisCount,
+            },
+        } as StoredOfflinePackage);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+export async function deletePackageFromDB(packageId: string): Promise<void> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).delete(packageId);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+export async function getPackageFromDB(packageId: string): Promise<StoredOfflinePackage | null> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const request = tx.objectStore(STORE_NAME).get(packageId) as IDBRequest<StoredOfflinePackage | undefined>;
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+export async function getPackageBinaryFromDB(packageId: string): Promise<Blob | undefined> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const request = tx.objectStore(STORE_NAME).get(packageId);
+        request.onsuccess = () => resolve(request.result?.data);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+export async function isPackageDownloaded(packageId: string): Promise<boolean> {
+    try {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const request = tx.objectStore(STORE_NAME).count(packageId);
+            request.onsuccess = () => resolve(request.result > 0);
+            request.onerror = () => reject(request.error);
+        });
+    } catch {
+        return false;
+    }
+}
+
+export async function saveMediaBlob(url: string, blob: Blob): Promise<void> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(MEDIA_STORE_NAME, 'readwrite');
+        tx.objectStore(MEDIA_STORE_NAME).put({ url, data: blob, saved_at: new Date().toISOString() });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+export async function getMediaBlob(url: string): Promise<Blob | null> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(MEDIA_STORE_NAME, 'readonly');
+        const request = tx.objectStore(MEDIA_STORE_NAME).get(url) as IDBRequest<{ data: Blob } | undefined>;
+        request.onsuccess = () => resolve(request.result?.data || null);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+export async function deleteMediaBlob(url: string): Promise<void> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(MEDIA_STORE_NAME, 'readwrite');
+        tx.objectStore(MEDIA_STORE_NAME).delete(url);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
     });
 }
 

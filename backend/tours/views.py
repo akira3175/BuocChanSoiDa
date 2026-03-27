@@ -1,12 +1,13 @@
 import json
 
-from rest_framework import generics, status
+from rest_framework import generics, status, viewsets, permissions
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Tour, Tour_POI
-from .serializers import TourSerializer, TourPOISerializer
+from .models import Tour, Tour_POI, TourReview
+from .serializers import TourSerializer, TourPOISerializer, TourReviewSerializer
+from pois.serializers import POIListSerializer
 
 
 class TourListView(generics.ListCreateAPIView):
@@ -109,6 +110,7 @@ class TourPOIGroupedView(APIView):
                 poi__status=1,
             )
             .select_related('poi', 'tour')
+            .prefetch_related('poi__media')
             .order_by('tour_id', 'sequence_order')
         )
 
@@ -127,17 +129,7 @@ class TourPOIGroupedView(APIView):
         for mapping in mappings:
             grouped[mapping.tour_id]['items'].append({
                 'sequence_order': mapping.sequence_order,
-                'poi': {
-                    'id': mapping.poi.id,
-                    'name': mapping.poi.name,
-                    'description': mapping.poi.description,
-                    'latitude': mapping.poi.latitude,
-                    'longitude': mapping.poi.longitude,
-                    'geofence_radius': mapping.poi.geofence_radius,
-                    'category': mapping.poi.category,
-                    'qr_code_data': mapping.poi.qr_code_data,
-                    'status': mapping.poi.status,
-                },
+                'poi': POIListSerializer(mapping.poi, context={'request': request}).data,
             })
 
         result = []
@@ -149,3 +141,22 @@ class TourPOIGroupedView(APIView):
             result.append(group)
 
         return Response(result)
+
+
+class TourReviewViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet cho phép xem và tạo đánh giá cho Tour.
+    """
+    queryset = TourReview.objects.all().select_related('user', 'tour')
+    serializer_class = TourReviewSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        tour_id = self.request.query_params.get('tour_id')
+        if tour_id:
+            queryset = queryset.filter(tour_id=tour_id)
+        return queryset

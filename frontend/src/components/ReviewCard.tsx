@@ -19,11 +19,11 @@ export default function ReviewCard({ review }: ReviewCardProps) {
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-3 animate-fade-slide-up">
             <div className="flex items-start gap-3">
                 <div className="size-10 rounded-full bg-gradient-to-br from-primary/80 to-orange-400 flex items-center justify-center shrink-0 shadow-inner text-white font-bold text-lg">
-                    {review.user_name.charAt(0).toUpperCase()}
+                    {review.username.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-bold text-slate-900 truncate pr-2">{review.user_name}</h4>
+                        <h4 className="text-sm font-bold text-slate-900 truncate pr-2">{review.username}</h4>
                         <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">{formattedDate}</span>
                     </div>
                     <div className="flex items-center gap-0.5 mt-0.5 mb-2">

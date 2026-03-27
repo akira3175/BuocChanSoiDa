@@ -6,6 +6,38 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 User = get_user_model()
 
 
+class GuestLoginSerializer(serializers.Serializer):
+    """Serializer nhận device_id để tạo/lấy tài khoản guest."""
+    device_id = serializers.CharField(required=True)
+
+
+class UpgradeGuestSerializer(serializers.Serializer):
+    """Serializer để nâng cấp tài khoản guest thành tài khoản thường."""
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        validators=[validate_password],
+        style={'input_type': 'password'}
+    )
+    password_confirm = serializers.CharField(
+        write_only=True,
+        style={'input_type': 'password'}
+    )
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email này đã được sử dụng.")
+        return value
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError(
+                {'password_confirm': 'Mật khẩu xác nhận không khớp.'}
+            )
+        return attrs
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     """Serializer đăng ký tài khoản mới."""
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, useMapEvents } from 'react-leaflet';
 import { useLocation, useNavigate } from 'react-router-dom';
 import L from 'leaflet';
@@ -15,7 +15,7 @@ import { getOfflinePOIsFromPackages } from '../services/offlineStorage';
 import NarrationBottomSheet from '../components/NarrationBottomSheet';
 import QRScanOverlay from '../components/QRScanOverlay';
 import BottomNavBar from '../components/BottomNavBar';
-import type { Media, Partner } from '../types';
+import type { Media, Partner, Language } from '../types';
 
 // Fix Leaflet default marker icons in Vite
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -82,13 +82,6 @@ function estimateTTSDuration(text: string): string {
     return `~${seconds}s`;
 }
 
-// MOCK POI data — phố Vĩnh Khánh, Quận 4, TP.HCM (fallback khi offline)
-const MOCK_POIS: POI[] = [
-    { id: '1', name: 'Hẻm Bánh Tráng Nướng', description: 'Hẻm nổi tiếng với bánh tráng nướng giòn rụm, được phủ đầy trứng cút, tôm khô và các loại topping. Một trong những món ăn đường phố đặc trưng của phố Vĩnh Khánh.', latitude: 10.7550, longitude: 106.7035, geofence_radius: 40, category: 'food', qr_code_data: 'BCSD-POI-001' },
-    { id: '2', name: 'Quán Hải Sản Đêm', description: 'Khu ẩm thực hải sản về đêm với các món ghẹ rang me, ốc hương xào, tôm nướng muối ớt được chế biến tươi ngon.', latitude: 10.7558, longitude: 106.7042, geofence_radius: 35, category: 'food', qr_code_data: 'BCSD-POI-002' },
-    { id: '3', name: 'Góc Chè & Nước Ép', description: 'Điểm dừng quen thuộc của dân địa phương với các loại chè truyền thống và nước ép trái cây nhiệt đới tươi mát.', latitude: 10.7545, longitude: 106.7028, geofence_radius: 30, category: 'food', qr_code_data: 'BCSD-POI-003' },
-    { id: '4', name: 'Chùa Vĩnh Khánh Cổ', description: 'Ngôi chùa cổ hơn 150 tuổi nằm giữa lòng phố ẩm thực, là nơi người dân địa phương đến cúng tế và cầu bình an.', latitude: 10.7565, longitude: 106.7050, geofence_radius: 50, category: 'historical', qr_code_data: 'BCSD-POI-004' },
-];
 
 // Vĩnh Khánh street center: Q4, HCMC
 const DEFAULT_CENTER: [number, number] = [10.7552, 106.7038];
@@ -96,7 +89,7 @@ const DEFAULT_CENTER: [number, number] = [10.7552, 106.7038];
 export default function MapExplore() {
     const { t } = useTranslation();
     const { user, openNarration, closeNarration, dispatch } = useApp();
-    const [pois, setPois] = useState<POI[]>(MOCK_POIS);
+    const [pois, setPois] = useState<POI[]>([]);
     const [showQR, setShowQR] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [narrationData, setNarrationData] = useState<{ poi: POI; media: Media | null; partners: Partner[] } | null>(null);
@@ -122,19 +115,34 @@ export default function MapExplore() {
         loadOfflinePois().catch(() => { /* ignore */ });
     }, [dispatch]);
 
-    // Fetch POIs từ backend khi có vị trí GPS
+    // Fetch POIs từ backend
     useEffect(() => {
-        if (!position) return;
+        // Luôn fetch POIs tại Vĩnh Khánh nếu không có GPS, 
+        // hoặc fetch theo GPS nếu có.
+        const searchLat = position?.lat || DEFAULT_CENTER[0];
+        const searchLng = position?.lng || DEFAULT_CENTER[1];
+        
+        // Ưu tiên ngôn ngữ từ localStorage (nguồn chính cho UI) trước khi dùng user state
+        const lang = localStorage.getItem('bcsd_language') || user?.preferred_language || 'vi';
+        const region = user?.preferred_voice_region || 'mien_nam';
+
         getPOIsNearMe(
-            position.lat,
-            position.lng,
-            user?.preferred_language || 'vi',
-            user?.preferred_voice_region || 'mien_nam'
+            searchLat,
+            searchLng,
+            lang,
+            region
         )
             .then((data) => {
                 if (data.length > 0) {
                     setPois(data);
                     dispatch({ type: 'SET_NEARBY_POIS', payload: data });
+                } else if (position) {
+                    // Nếu ở vị trí hiện tại không có POI nào, hãy fetch lại ở Vĩnh Khánh để bản đồ không trống
+                    getPOIsNearMe(DEFAULT_CENTER[0], DEFAULT_CENTER[1], lang, region)
+                        .then(hcmData => {
+                            setPois(hcmData);
+                            dispatch({ type: 'SET_NEARBY_POIS', payload: hcmData });
+                        });
                 }
             })
             .catch(async () => {
@@ -145,12 +153,12 @@ export default function MapExplore() {
                 }
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [position?.lat, position?.lng]);
+    }, [position?.lat, position?.lng, user?.id]);
 
     // Narration engine callbacks
     const handleNarrationReady = useCallback((poi: POI, media: Media | null, partners: Partner[]) => {
         setNarrationData({ poi, media, partners });
-        openNarration(poi, undefined, partners);
+        openNarration(poi, media, partners);
     }, [openNarration]);
 
     const handleNarrationConflict = useCallback((newPoi: POI) => {
@@ -158,7 +166,7 @@ export default function MapExplore() {
     }, [dispatch]);
 
     const { triggerNarration, finishNarration } = useNarrationEngine({
-        language: user?.preferred_language || 'vi',
+        language: (localStorage.getItem('bcsd_language') as Language) || user?.preferred_language || 'vi',
         voiceRegion: user?.preferred_voice_region || 'mien_nam',
         onNarrationReady: handleNarrationReady,
         onNarrationConflict: handleNarrationConflict,
@@ -185,9 +193,25 @@ export default function MapExplore() {
         },
     });
 
-    const handlePOIMarkerClick = useCallback((poi: POI) => {
+    const handlePOIPopupOpen = useCallback((poi: POI) => {
+        // Unlock NGAY LẬP TỨC từ event click của user
         unlockAudioAndTTS();
-        // Sử dụng 'QR' trigger type để bypass anti-spam khi click thủ công
+        
+        // Mẹo cho Windows/Chrome: Phát 1 câu rỗng ngay lập tức để giữ quyền "User Gesture"
+        if ('speechSynthesis' in window) {
+            const silent = new SpeechSynthesisUtterance(' ');
+            silent.volume = 0;
+            window.speechSynthesis.speak(silent);
+        }
+
+        console.log('[Map] Triggering narration for:', poi.name);
+        // Sử dụng 'AUTO' để tôn trọng luật anti-spam (chỉ phát lần đầu hoặc sau 10p)
+        triggerNarration(poi, 'AUTO');
+    }, [triggerNarration]);
+
+    const handleManualNarration = useCallback((poi: POI) => {
+        unlockAudioAndTTS();
+        // Sử dụng 'QR' để bypass anti-spam khi click nút thủ công
         triggerNarration(poi, 'QR');
     }, [triggerNarration]);
 
@@ -259,41 +283,50 @@ export default function MapExplore() {
 
                     {/* POI Markers */}
                     {filteredPOIs.map((poi) => (
-                        <Marker
-                            key={poi.id}
-                            position={[poi.latitude, poi.longitude]}
-                            icon={getPOIIcon(poi.category)}
-                            eventHandlers={{ click: () => handlePOIMarkerClick(poi) }}
-                        >
-                            <Popup minWidth={220} maxWidth={300}>
-                                <div className="text-sm font-semibold">{poi.name}</div>
-                                <div className="text-xs text-slate-600 mt-1 leading-relaxed line-clamp-4">
-                                    {(poi.translated_description || poi.description).slice(0, 150)}
-                                    {(poi.translated_description || poi.description).length > 150 ? '...' : ''}
-                                </div>
-                                <div className="mt-2 text-[10px] text-primary font-bold bg-primary\/10 w-fit px-2 py-0.5 rounded-full inline-block">
-                                    {poi.category === 'food' ? t('tour.categoryFood', { defaultValue: 'Ẩm thực' }) : t('tour.categoryHistorical', { defaultValue: 'Di tích' })}
-                                </div>
-                                <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
-                                    <div className="flex items-center gap-1 text-[10px] font-medium text-slate-500">
-                                        <span className="material-symbols-outlined text-[14px]">headphones</span>
-                                        {estimateTTSDuration(poi.translated_description || poi.description)}
+                        <React.Fragment key={`${poi.id}-${user?.preferred_language}`}>
+                            <Marker
+                                position={[poi.latitude, poi.longitude]}
+                                icon={getPOIIcon(poi.category)}
+                                eventHandlers={{ 
+                                    popupopen: () => {
+                                        console.log('[Map] Popup opened for:', poi.name);
+                                        handlePOIPopupOpen(poi);
+                                    }
+                                }}
+                            >
+                                <Popup minWidth={220} maxWidth={300}>
+                                    <div className="text-sm font-semibold">{poi.translated_name || poi.name}</div>
+                                    <div className="text-xs text-slate-600 mt-1 leading-relaxed line-clamp-4">
+                                        {(poi.translated_description || poi.description).slice(0, 150)}
+                                        {(poi.translated_description || poi.description).length > 150 ? '...' : ''}
                                     </div>
-                                    <button
-                                        onClick={() => handlePOIMarkerClick(poi)}
-                                        className="px-3 py-1.5 bg-primary text-white rounded-full text-xs font-bold active:scale-95 transition-transform shadow-sm"
-                                    >
-                                        {t('map.listenNarration')}
-                                    </button>
-                                </div>
-                            </Popup>
-                            {/* Geofence visualization */}
+                                    <div className="mt-2 text-[10px] text-primary font-bold bg-primary/10 w-fit px-2 py-0.5 rounded-full inline-block">
+                                        {poi.category === 'food' ? t('tour.categoryFood', { defaultValue: 'Ẩm thực' }) : t('tour.categoryHistorical', { defaultValue: 'Di tích' })}
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
+                                        <div className="flex items-center gap-1 text-[10px] font-medium text-slate-500">
+                                            <span className="material-symbols-outlined text-[14px]">headphones</span>
+                                            {estimateTTSDuration(poi.translated_description || poi.description)}
+                                        </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleManualNarration(poi);
+                                            }}
+                                            className="px-3 py-1.5 bg-primary text-white rounded-full text-xs font-bold active:scale-95 transition-transform shadow-sm"
+                                        >
+                                            {t('map.listenNarration')}
+                                        </button>
+                                    </div>
+                                </Popup>
+                            </Marker>
+                            {/* Geofence visualization (Sibling) */}
                             <Circle
                                 center={[poi.latitude, poi.longitude]}
                                 radius={poi.geofence_radius}
                                 pathOptions={{ color: '#ff6a00', fillColor: '#ff6a00', fillOpacity: 0.06, weight: 1, dashArray: '4 4' }}
                             />
-                        </Marker>
+                        </React.Fragment>
                     ))}
                 </MapContainer>
             </div>
@@ -348,7 +381,7 @@ export default function MapExplore() {
                                 className="w-full px-4 py-3 border-b border-slate-100 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left flex items-start gap-3 last:border-b-0"
                             >
                                 <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-sm text-slate-900 truncate">{poi.name}</p>
+                                    <p className="font-semibold text-sm text-slate-900 truncate">{poi.translated_name || poi.name}</p>
                                     <p className="text-xs text-slate-500 line-clamp-2">
                                         {(poi.translated_description || poi.description).slice(0, 80)}
                                         {(poi.translated_description || poi.description).length > 80 ? '...' : ''}
@@ -399,7 +432,7 @@ export default function MapExplore() {
 
             {/* NARRATION BOTTOM SHEET OVERLAY */}
             {narrationData && (
-                <div className="absolute inset-0 z-30 flex flex-col justify-end bg-black/20 backdrop-blur-sm">
+                <div key={narrationData.poi.id} className="absolute inset-0 z-30 flex flex-col justify-end bg-black/20 backdrop-blur-sm">
                     <NarrationBottomSheet
                         poi={narrationData.poi}
                         media={narrationData.media}

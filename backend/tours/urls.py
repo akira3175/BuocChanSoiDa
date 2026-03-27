@@ -1,4 +1,5 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 
 from .views import (
     TourListView, 
@@ -6,9 +7,13 @@ from .views import (
     TourPOIListCreateView,
     TourPOIDetailView,
     TourPOIGroupedView,
+    TourReviewViewSet,
 )
 
 app_name = 'tours'
+
+router = DefaultRouter()
+router.register(r'reviews', TourReviewViewSet, basename='tour-review')
 
 urlpatterns = [
     path('', TourListView.as_view(), name='tour-list'),
@@ -16,4 +21,5 @@ urlpatterns = [
     path('tour-pois/', TourPOIGroupedView.as_view(), name='tour-poi-grouped'),
     path('pois/', TourPOIListCreateView.as_view(), name='tour-poi-list'),
     path('pois/<int:pk>/', TourPOIDetailView.as_view(), name='tour-poi-detail'),
+    path('', include(router.urls)),
 ]

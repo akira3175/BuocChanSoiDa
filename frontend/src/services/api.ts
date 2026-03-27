@@ -14,6 +14,7 @@ import type {
     PartnerLoginPayload,
     PartnerSignupPayload,
     PartnerAuthUser,
+    UserAuthSession,
 } from '../types';
 
 export interface Invoice {
@@ -36,6 +37,7 @@ const apiClient = axios.create({
 });
 
 const PARTNER_AUTH_STORAGE_KEY = 'bcsd_partner_auth';
+const USER_AUTH_STORAGE_KEY = 'bcsd_user_auth';
 
 interface PartnerLoginResponse {
     access: string;
@@ -52,14 +54,6 @@ interface PartnerSignupResponse {
     user: PartnerAuthUser;
 }
 
-const applyAuthHeader = (accessToken?: string) => {
-    if (accessToken) {
-        apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-        return;
-    }
-    delete apiClient.defaults.headers.common.Authorization;
-};
-
 export const getPartnerAuthSession = (): PartnerAuthSession | null => {
     try {
         const raw = localStorage.getItem(PARTNER_AUTH_STORAGE_KEY);
@@ -73,11 +67,9 @@ export const getPartnerAuthSession = (): PartnerAuthSession | null => {
 export const setPartnerAuthSession = (session: PartnerAuthSession | null): void => {
     if (!session) {
         localStorage.removeItem(PARTNER_AUTH_STORAGE_KEY);
-        applyAuthHeader();
         return;
     }
     localStorage.setItem(PARTNER_AUTH_STORAGE_KEY, JSON.stringify(session));
-    applyAuthHeader(session.tokens.access);
 };
 
 export const isPartnerAuthenticated = (): boolean => {
@@ -85,12 +77,31 @@ export const isPartnerAuthenticated = (): boolean => {
     return Boolean(session?.tokens.access);
 };
 
-const existingSession = getPartnerAuthSession();
-if (existingSession?.tokens.access) {
-    applyAuthHeader(existingSession.tokens.access);
-}
+export const getUserAuthSession = (): UserAuthSession | null => {
+    try {
+        const raw = localStorage.getItem(USER_AUTH_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as UserAuthSession;
+    } catch {
+        return null;
+    }
+};
+
+export const setUserAuthSession = (session: UserAuthSession | null): void => {
+    if (!session) {
+        localStorage.removeItem(USER_AUTH_STORAGE_KEY);
+        return;
+    }
+    localStorage.setItem(USER_AUTH_STORAGE_KEY, JSON.stringify(session));
+};
+
+export const isUserAuthenticated = (): boolean => {
+    const session = getUserAuthSession();
+    return Boolean(session?.tokens.access);
+};
 
 let partnerRefreshPromise: Promise<string> | null = null;
+let userRefreshPromise: Promise<string> | null = null;
 
 // Offline mode interceptor - kiểm tra flag từ localStorage
 // Cơ chế Switch Logic: khi offline, request ghi (POST/PUT) vào SyncQueue,
@@ -116,95 +127,124 @@ apiClient.interceptors.request.use((config) => {
         error.isOfflineMode = true;
         throw error;
     }
+
+    // Auth Header Logic
+    const url = config.url || '';
+    const isPartnerRoute = url.includes('/partners/');
+    if (isPartnerRoute) {
+        const session = getPartnerAuthSession();
+        if (session?.tokens.access) {
+            config.headers.Authorization = `Bearer ${session.tokens.access}`;
+        }
+    } else {
+        const session = getUserAuthSession();
+        if (session?.tokens.access) {
+            config.headers.Authorization = `Bearer ${session.tokens.access}`;
+        }
+    }
+
+    // Set Accept-Language header so backend (Django) can return translated content
+    const lang = localStorage.getItem('bcsd_language') || 'vi';
+    config.headers['Accept-Language'] = lang;
+
     return config;
 });
 
-// --- Partner token refresh (JWT) ---
-// Trường hợp access token hết hạn/không hợp lệ nhưng refresh token còn dùng được,
-// tự động refresh và retry request đúng 1 lần.
+// --- Token refresh logic (JWT) ---
+// Handles both Partner and User sessions
 apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
-        if (!axios.isAxiosError(error)) {
+        if (!axios.isAxiosError(error) || error.response?.status !== 401) {
             return Promise.reject(error);
         }
 
-        const status = error.response?.status;
         const originalRequest = error.config as (any & { _retry?: boolean }) | undefined;
-
-        // Chỉ xử lý cho Partner auth 401
-        if (status !== 401 || !originalRequest) {
-            return Promise.reject(error);
-        }
-
-        // Tránh loop
-        if (originalRequest._retry) {
+        if (!originalRequest || originalRequest._retry) {
             return Promise.reject(error);
         }
 
         const url = originalRequest.url || '';
-        const isRefreshCall =
-            url.includes('/partners/account/login/refresh/') ||
-            url.includes('/partners/account/logout/') ||
-            url.includes('/partners/account/login/');
+        const isPartnerRoute = url.includes('/partners/');
 
-        if (isRefreshCall) {
+        // Avoid refresh loop for login/refresh/logout/guest endpoints
+        const isAuthRoute =
+            url.includes('/login/') ||
+            url.includes('/refresh/') ||
+            url.includes('/logout/') ||
+            url.includes('/guest-login/') ||
+            url.includes('/upgrade-guest/');
+
+        if (isAuthRoute) {
             return Promise.reject(error);
         }
 
-        const session = getPartnerAuthSession();
-        if (!session?.tokens.refresh) {
-            setPartnerAuthSession(null);
-            return Promise.reject(error);
-        }
-
-        try {
-            if (!partnerRefreshPromise) {
-                partnerRefreshPromise = (async () => {
-                    const refreshResp = await axios.post(
-                        `${API_BASE_URL}/partners/account/login/refresh/`,
-                        { refresh: session.tokens.refresh },
-                        { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
-                    );
-
-                    const newAccess: string | undefined = (refreshResp.data as any)?.access;
-                    if (!newAccess) {
-                        throw new Error('NO_NEW_ACCESS');
-                    }
-
-                    const nextSession: PartnerAuthSession = {
-                        ...session,
-                        tokens: {
-                            ...session.tokens,
-                            access: newAccess,
-                        },
-                    };
-                    setPartnerAuthSession(nextSession);
-                    return newAccess;
-                })().finally(() => {
-                    partnerRefreshPromise = null;
-                });
-            }
-
-            await partnerRefreshPromise;
-            originalRequest._retry = true;
-
-            const current = getPartnerAuthSession();
-            if (!current?.tokens.access) {
+        if (isPartnerRoute) {
+            // --- PARTNER REFRESH ---
+            const session = getPartnerAuthSession();
+            if (!session?.tokens.refresh) {
+                setPartnerAuthSession(null);
                 return Promise.reject(error);
             }
 
-            // Gắn lại header Authorization trước khi retry
-            originalRequest.headers = {
-                ...(originalRequest.headers || {}),
-                Authorization: `Bearer ${current.tokens.access}`,
-            };
+            try {
+                if (!partnerRefreshPromise) {
+                    partnerRefreshPromise = (async () => {
+                        const refreshResp = await axios.post(
+                            `${API_BASE_URL}/partners/account/login/refresh/`,
+                            { refresh: session.tokens.refresh },
+                            { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+                        );
+                        const newAccess = (refreshResp.data as any)?.access;
+                        if (!newAccess) throw new Error('Refresh failed');
+                        
+                        const nextSession: PartnerAuthSession = { ...session, tokens: { ...session.tokens, access: newAccess } };
+                        setPartnerAuthSession(nextSession);
+                        return newAccess;
+                    })().finally(() => { partnerRefreshPromise = null; });
+                }
 
-            return apiClient(originalRequest);
-        } catch {
-            // Refresh thất bại: xoá session để UI chuyển về login
-            setPartnerAuthSession(null);
-            return Promise.reject(error);
+                const newAccess = await partnerRefreshPromise;
+                originalRequest._retry = true;
+                originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+                return apiClient(originalRequest);
+            } catch {
+                setPartnerAuthSession(null);
+                return Promise.reject(error);
+            }
+        } else {
+            // --- USER/GUEST REFRESH ---
+            const session = getUserAuthSession();
+            if (!session?.tokens.refresh) {
+                setUserAuthSession(null);
+                return Promise.reject(error);
+            }
+
+            try {
+                if (!userRefreshPromise) {
+                    userRefreshPromise = (async () => {
+                        const refreshResp = await axios.post(
+                            `${API_BASE_URL}/users/login/refresh/`,
+                            { refresh: session.tokens.refresh },
+                            { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+                        );
+                        const newAccess = (refreshResp.data as any)?.access;
+                        if (!newAccess) throw new Error('Refresh failed');
+                        
+                        const nextSession: UserAuthSession = { ...session, tokens: { ...session.tokens, access: newAccess } };
+                        setUserAuthSession(nextSession);
+                        return newAccess;
+                    })().finally(() => { userRefreshPromise = null; });
+                }
+
+                const newAccess = await userRefreshPromise;
+                originalRequest._retry = true;
+                originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+                return apiClient(originalRequest);
+            } catch {
+                setUserAuthSession(null);
+                return Promise.reject(error);
+            }
         }
     }
 );
@@ -212,6 +252,18 @@ apiClient.interceptors.response.use(
 // --- User endpoints ---
 export const initUser = async (deviceId: string): Promise<User> => {
     const { data } = await apiClient.post<User>('/users/init', { device_id: deviceId });
+    return data;
+};
+
+export const guestLogin = async (deviceId: string): Promise<UserAuthSession> => {
+    const { data } = await apiClient.post<UserAuthSession>('/users/guest-login/', { device_id: deviceId });
+    setUserAuthSession(data);
+    return data;
+};
+
+export const upgradeGuestAccount = async (payload: { email: string; password: string; password_confirm: string }): Promise<UserAuthSession> => {
+    const { data } = await apiClient.post<UserAuthSession>('/users/upgrade-guest/', payload);
+    setUserAuthSession(data);
     return data;
 };
 
@@ -447,12 +499,14 @@ export const getTourPOIGroups = async (tourIds?: string[]): Promise<TourPOIGroup
 };
 
 export const getTourReviews = async (tourId: string): Promise<TourReview[]> => {
-    const { data } = await apiClient.get<TourReview[]>(`/tours/${tourId}/reviews/`);
+    const { data } = await apiClient.get<TourReview[]>(`/tours/reviews/`, {
+        params: { tour_id: tourId }
+    });
     return data;
 };
 
-export const submitTourReview = async (review: Omit<TourReview, 'id' | 'created_at'>): Promise<TourReview> => {
-    const { data } = await apiClient.post<TourReview>(`/tours/${review.tour_id}/reviews/`, review);
+export const submitTourReview = async (review: Omit<TourReview, 'id' | 'created_at' | 'user_email' | 'username'>): Promise<TourReview> => {
+    const { data } = await apiClient.post<TourReview>(`/tours/reviews/`, review);
     return data;
 };
 

@@ -100,6 +100,13 @@ class Media(models.Model):
             'Nhấn "Tự động dịch" để tự động điền từ mô tả tiếng Việt.'
         ),
     )
+    translated_name = models.CharField(
+        'Tên đã dịch',
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='Tên POI bằng ngôn ngữ này (ví dụ: tên tiếng Nhật).',
+    )
     language = models.CharField(
         'Ngôn ngữ',
         max_length=10,

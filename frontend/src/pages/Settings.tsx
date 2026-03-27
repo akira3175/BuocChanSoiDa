@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import AppLayout from '../components/AppLayout';
+import AccountUpgradeModal from '../components/AccountUpgradeModal';
 import { SettingsSkeleton, staggerStyle } from '../components/Skeleton';
-import { setPartnerAuthSession } from '../services/api';
+import { setPartnerAuthSession, getUserAuthSession, setUserAuthSession } from '../services/api';
 import { useDeviceInfo } from '../hooks/useDeviceInfo';
 import type { Language, VoiceRegion } from '../types';
 
@@ -26,6 +27,7 @@ export default function Settings() {
     const [saved, setSaved] = useState(false);
     const [loading, setLoading] = useState(true);
     const [showDeviceInfo, setShowDeviceInfo] = useState(false);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
     const VOICE_REGIONS: { value: VoiceRegion; label: string; subtitle: string; icon: string }[] = [
         { value: 'mien_nam', label: t('settings.voiceSouth'), subtitle: t('settings.voiceSouthDesc'), icon: '🌴' },
@@ -40,7 +42,14 @@ export default function Settings() {
 
     const handleSave = () => {
         if (user) {
-            dispatch({ type: 'SET_USER', payload: { ...user, preferred_language: language, preferred_voice_region: voiceRegion } });
+            const updatedUser = { ...user, preferred_language: language, preferred_voice_region: voiceRegion };
+            dispatch({ type: 'SET_USER', payload: updatedUser });
+            
+            // Persist the updated user in the current session
+            const session = getUserAuthSession();
+            if (session) {
+                setUserAuthSession({ ...session, user: updatedUser });
+            }
         }
         localStorage.setItem('bcsd_language', language);
         localStorage.setItem('bcsd_voice_region', voiceRegion);
@@ -82,9 +91,19 @@ export default function Settings() {
                     <div className="size-14 rounded-full bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center shadow-lg shadow-primary\/20">
                         <span className="material-symbols-outlined text-white text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
                     </div>
-                    <div>
-                        <p className="font-bold text-slate-900">{t('settings.tourist')}</p>
-                        <p className="text-xs text-slate-400 mt-0.5 font-mono">{user?.device_id?.slice(0, 20)}...</p>
+                    <div className="flex-1">
+                        <p className="font-bold text-slate-900">{user?.full_name || t('settings.tourist')}</p>
+                        {user?.email?.endsWith('@guest.bcsd.local') ? (
+                            <button
+                                onClick={() => setShowUpgradeModal(true)}
+                                className="mt-1 flex items-center gap-1 text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full tap-scale"
+                            >
+                                <span className="material-symbols-outlined text-[14px]">link</span>
+                                {t('settings.linkAccount')}
+                            </button>
+                        ) : (
+                            <p className="text-xs text-slate-500 mt-0.5">{user?.email}</p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -157,9 +176,8 @@ export default function Settings() {
                 </div>
             </div>
 
-            {/* Device Info Section */}
             <div className="mx-4 mt-5 animate-stagger-item" style={staggerStyle(3)}>
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Thông tin thiết bị</h3>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">{t('settings.deviceInfo')}</h3>
                 <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100">
                     <button
                         onClick={() => setShowDeviceInfo(!showDeviceInfo)}
@@ -167,7 +185,7 @@ export default function Settings() {
                     >
                         <div className="flex items-center gap-3">
                             <span className="material-symbols-outlined text-slate-600 text-xl" style={{ fontVariationSettings: "'FILL' 0" }}>devices</span>
-                            <span className="text-sm font-semibold text-slate-700">Xem chi tiết thiết bị</span>
+                            <span className="text-sm font-semibold text-slate-700">{t('settings.viewDeviceDetails')}</span>
                         </div>
                         <span className={`material-symbols-outlined text-slate-400 text-lg transition-transform ${showDeviceInfo ? 'rotate-180' : ''}`} style={{ fontVariationSettings: "'FILL' 0" }}>expand_more</span>
                     </button>
@@ -187,19 +205,19 @@ export default function Settings() {
                                 <span className="text-xs text-slate-600">{deviceInfo.userAgent.split(' ').slice(-2).join(' ')}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                                <span className="text-xs text-slate-500">Màn hình</span>
+                                <span className="text-xs text-slate-500">{t('settings.screen')}</span>
                                 <span className="text-xs text-slate-600">{deviceInfo.screenResolution}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                                <span className="text-xs text-slate-500">Ngôn ngữ</span>
+                                <span className="text-xs text-slate-500">{t('settings.languageLabel')}</span>
                                 <span className="text-xs text-slate-600">{deviceInfo.language}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                                <span className="text-xs text-slate-500">Múi giờ</span>
+                                <span className="text-xs text-slate-500">{t('settings.timezone')}</span>
                                 <span className="text-xs text-slate-600">{deviceInfo.timezone}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                                <span className="text-xs text-slate-500">Kết nối</span>
+                                <span className="text-xs text-slate-500">{t('settings.connection')}</span>
                                 <span className="text-xs text-slate-600">
                                     {deviceInfo.onLine ? (
                                         <span className="flex items-center gap-1">
@@ -216,13 +234,13 @@ export default function Settings() {
                             </div>
                             {deviceInfo.memory && (
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs text-slate-500">Bộ nhớ</span>
+                                    <span className="text-xs text-slate-500">{t('settings.memory')}</span>
                                     <span className="text-xs text-slate-600">{deviceInfo.memory} GB</span>
                                 </div>
                             )}
                             {deviceInfo.hardwareConcurrency && (
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs text-slate-500">CPU</span>
+                                    <span className="text-xs text-slate-500">{t('settings.cpu')}</span>
                                     <span className="text-xs text-slate-600">{deviceInfo.hardwareConcurrency} cores</span>
                                 </div>
                             )}
@@ -257,9 +275,9 @@ export default function Settings() {
                 >
                     <div className="flex items-center justify-between gap-3">
                         <div>
-                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Thanh toán</p>
-                            <h3 className="mt-1 text-sm font-bold text-slate-900">Xem hóa đơn</h3>
-                            <p className="mt-1 text-xs text-slate-500">Đặt món ăn</p>
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('settings.payment')}</p>
+                            <h3 className="mt-1 text-sm font-bold text-slate-900">{t('settings.viewInvoices')}</h3>
+                            <p className="mt-1 text-xs text-slate-500">{t('settings.orderFood')}</p>
                         </div>
                         <div className="flex size-10 items-center justify-center rounded-full bg-slate-900 text-white">
                             <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>receipt_long</span>
@@ -282,9 +300,13 @@ export default function Settings() {
                     onClick={handleUserLogout}
                     className="mt-3 w-full rounded-2xl border border-rose-200 bg-rose-50 py-3 text-sm font-bold text-rose-700 transition hover:bg-rose-100"
                 >
-                    Đăng xuất tài khoản người dùng
+                    {t('settings.logout')}
                 </button>
             </div>
+
+            {showUpgradeModal && (
+                <AccountUpgradeModal onClose={() => setShowUpgradeModal(false)} />
+            )}
         </AppLayout>
     );
 }

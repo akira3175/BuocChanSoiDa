@@ -33,29 +33,55 @@ class POIListSerializer(serializers.ModelSerializer):
     Serializer nhẹ cho near-me và scan — không embed media/partners
     để giảm payload khi trả về danh sách.
     """
+    translated_name = serializers.SerializerMethodField()
     translated_description = serializers.SerializerMethodField()
     distance = serializers.FloatField(read_only=True, default=None)
 
     class Meta:
         model = POI
         fields = [
-            'id', 'name', 'description', 'translated_description',
+            'id', 'name', 'translated_name', 'description', 'translated_description',
             'latitude', 'longitude', 'geofence_radius',
             'category', 'qr_code_data', 'status',
             'distance',
         ]
 
+    def get_translated_name(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return obj.name
+        
+        lang = request.query_params.get('language')
+        if not lang:
+            accept_lang = request.headers.get('Accept-Language', 'vi')
+            lang = accept_lang.split(',')[0].split('-')[0].lower()
+
+        if lang == 'vi':
+            return obj.name
+        
+        media_list = getattr(obj, '_prefetched_media_cache', obj.media.all())
+        for m in media_list:
+            if m.language == lang and m.translated_name:
+                return m.translated_name
+        return obj.name
+
     def get_translated_description(self, obj):
         request = self.context.get('request')
         if not request:
             return obj.description
-        lang = request.query_params.get('language', 'vi')
+        
+        # Priority: Query param > Accept-Language header > Default 'vi'
+        lang = request.query_params.get('language')
+        if not lang:
+            # Note: headers.get returns the raw Value (e.g. 'en-US,en;q=0.9'). 
+            # For simplicity, we take the first 2 chars or check if it starts with known codes.
+            accept_lang = request.headers.get('Accept-Language', 'vi')
+            lang = accept_lang.split(',')[0].split('-')[0].lower()
+
         if lang == 'vi':
             return obj.description
         
         # Tìm bản dịch trong media (đã được prefetch nếu gọi từ POINearMeView)
-        # Nếu dùng obj.media.filter(...) nó sẽ query tiếp (N+1). 
-        # Tốt hơn là dùng list comprehension trên bộ nhớ nếu đã prefetch.
         media_list = getattr(obj, '_prefetched_media_cache', obj.media.all())
         for m in media_list:
             if m.language == lang and m.tts_content:
@@ -67,22 +93,46 @@ class POIDetailSerializer(serializers.ModelSerializer):
     """Serializer đầy đủ cho GET /pois/<id>/ — embed media + partners."""
     media = MediaSerializer(many=True, read_only=True)
     partners = PartnerSerializer(many=True, read_only=True)
+    translated_name = serializers.SerializerMethodField()
     translated_description = serializers.SerializerMethodField()
 
     class Meta:
         model = POI
         fields = [
-            'id', 'name', 'description', 'translated_description',
+            'id', 'name', 'translated_name', 'description', 'translated_description',
             'latitude', 'longitude', 'geofence_radius',
             'category', 'qr_code_data', 'status',
             'media', 'partners',
         ]
 
+    def get_translated_name(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return obj.name
+        
+        lang = request.query_params.get('language')
+        if not lang:
+            accept_lang = request.headers.get('Accept-Language', 'vi')
+            lang = accept_lang.split(',')[0].split('-')[0].lower()
+
+        if lang == 'vi':
+            return obj.name
+        
+        for m in obj.media.all():
+            if m.language == lang and m.translated_name:
+                return m.translated_name
+        return obj.name
+
     def get_translated_description(self, obj):
         request = self.context.get('request')
         if not request:
             return obj.description
-        lang = request.query_params.get('language', 'vi')
+        
+        lang = request.query_params.get('language')
+        if not lang:
+            accept_lang = request.headers.get('Accept-Language', 'vi')
+            lang = accept_lang.split(',')[0].split('-')[0].lower()
+
         if lang == 'vi':
             return obj.description
         

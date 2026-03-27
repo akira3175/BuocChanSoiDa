@@ -55,7 +55,10 @@
         "beFirstReview": "最初のレビューを書きましょう！",
         "categoryFood": "🍜 グルメ",
         "categoryHistorical": "🏛️ 史跡",
-        "defaultDescription": "ヴィンカン通りの特別なグルメスポット。"
+        "defaultDescription": "ヴィンカン通りの特別なグルメスポット。",
+        "notFound": "ツアーが見つかりません",
+        "backToRoutes": "ルートに戻る",
+        "relatedPOIs": "関連スポット"
     },
     "offline": {
         "title": "オフラインデータをダウンロード",
@@ -82,7 +85,31 @@
         "voiceCentral": "中部アクセント",
         "voiceCentralDesc": "中部ベトナムアクセント",
         "appInfo": "アプリ情報",
-        "appName": "ヴィンカンフードストリート"
+        "appName": "ビンカン・フードストリート",
+        "deviceInfo": "デバイス情報",
+        "viewDeviceDetails": "デバイスの詳細を表示",
+        "screen": "画面",
+        "languageLabel": "言語",
+        "timezone": "タイムゾーン",
+        "connection": "接続",
+        "memory": "メモリ",
+        "cpu": "CPU",
+        "payment": "決済",
+        "viewInvoices": "請求を表示",
+        "orderFood": "料理を注文",
+        "logout": "ログアウト",
+        "linkAccount": "アカウントを連携",
+    "upgradeTitle": "アカウントを連携",
+    "upgradeDescription": "メールアドレスを追加して、データを保護し、他のデバイスで情報を表示します。",
+    "upgradeSuccess": "アップグレードに成功しました！",
+    "emailPlaceholder": "メールアドレスを入力してください",
+    "password": "パスワード",
+    "passwordMinChars": "少なくとも8文字",
+    "passwordConfirm": "パスワードを再入力",
+    "passwordConfirmPlaceholder": "パスワードをもう一度入力してください",
+    "complete": "完了",
+    "errorPasswordMismatch": "確認用パスワードが一致しません。",
+    "errorGeneral": "エラーが発生しました。もう一度お試しください。"
     },
     "narration": {
         "narrationPoint": "ナレーションポイント",
@@ -135,10 +162,8 @@
         "savedAt": "{{time}} に保存しました"
     },
     "review": {
-        "writeReview": "レビューを書く",
-        "yourRating": "体験はいかがでしたか？",
-        "commentPlaceholder": "体験についてもっとシェアしてください（任意）...",
         "submit": "送信する",
+        "writeReview": "レビューを書く",
         "reviewCount": "レビュー",
         "anonymous": "観光客",
         "errorNoRating": "星の評価を選択してください。",

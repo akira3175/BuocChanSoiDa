@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap, Popup, useMa
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTranslation } from 'react-i18next';
-import type { Tour, POI, Media, Partner } from '../types';
+import type { Tour, POI, Media, Partner, Language } from '../types';
 import TourCard from '../components/TourCard';
 import AppLayout from '../components/AppLayout';
 import NarrationBottomSheet from '../components/NarrationBottomSheet';
@@ -19,6 +19,7 @@ import { useGeofence } from '../hooks/useGeofence';
 import { useNarrationEngine } from '../hooks/useNarrationEngine';
 import { useTourReviews } from '../hooks/useTourReviews';
 import { useApp } from '../context/AppContext';
+import { unlockAudioAndTTS } from '../hooks/useAudioPlayer';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -119,7 +120,7 @@ function getPOIStatus(index: number, currentIndex: number): POIStatus {
 }
 
 export default function GuidedTour() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { user, openNarration, closeNarration, dispatch } = useApp();
     const [tours, setTours] = useState<Tour[]>([]);
     const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
@@ -193,7 +194,7 @@ export default function GuidedTour() {
     // Narration callbacks
     const handleNarrationReady = useCallback((poi: POI, media: Media | null, partners: Partner[]) => {
         setNarrationData({ poi, media, partners });
-        openNarration(poi, undefined, partners);
+        openNarration(poi, media, partners);
     }, [openNarration]);
 
     const handleNarrationConflict = useCallback((newPoi: POI) => {
@@ -201,7 +202,7 @@ export default function GuidedTour() {
     }, [dispatch]);
 
     const { triggerNarration, finishNarration } = useNarrationEngine({
-        language: user?.preferred_language || 'vi',
+        language: (localStorage.getItem('bcsd_language') as Language) || user?.preferred_language || 'vi',
         voiceRegion: user?.preferred_voice_region || 'mien_nam',
         onNarrationReady: handleNarrationReady,
         onNarrationConflict: handleNarrationConflict,
@@ -245,6 +246,21 @@ export default function GuidedTour() {
         setNarrationData(null);
         closeNarration();
     }, [finishNarration, closeNarration]);
+
+    const handlePOIPopupOpen = useCallback((poi: POI) => {
+        // Unlock NGAY LẬP TỨC từ event click của user
+        unlockAudioAndTTS();
+        
+        // Mẹo cho Windows/Chrome: Phát 1 câu rỗng ngay lập tức để giữ quyền "User Gesture"
+        if ('speechSynthesis' in window) {
+            const silent = new SpeechSynthesisUtterance(' ');
+            silent.volume = 0;
+            window.speechSynthesis.speak(silent);
+        }
+
+        console.log('[Tour] Triggering narration for:', poi.name);
+        triggerNarration(poi, 'AUTO');
+    }, [triggerNarration]);
 
     if (loading) {
         return (
@@ -327,7 +343,7 @@ export default function GuidedTour() {
                             </div>
                             <div>
                                 <p className="text-slate-900 text-sm font-bold">{t('tour.nextStop')}</p>
-                                <p className="text-primary text-base font-bold">{nextPOI.name}</p>
+                                <p className="text-primary text-base font-bold">{nextPOI.translated_name || nextPOI.name}</p>
                             </div>
                         </div>
                         <div className="flex items-center justify-between">
@@ -355,7 +371,12 @@ export default function GuidedTour() {
                                 <TourCard
                                     tour={tour}
                                     isActive={selectedTour.id === tour.id}
-                                    onClick={() => navigate(`/tours/${tour.id}`)}
+                                    onClick={() => {
+                                        setSelectedTour(tour);
+                                        // Auto switch to route tab if not already
+                                        if (activeTab === 'overview') setActiveTab('route');
+                                    }}
+                                    onDetailClick={() => navigate(`/tours/${tour.id}`)}
                                 />
                             </div>
                         ))}
@@ -417,11 +438,15 @@ export default function GuidedTour() {
                                             key={tp.poi.id}
                                             position={[tp.poi.latitude, tp.poi.longitude]}
                                             icon={createTourPOIIcon(index, status)}
+                                            eventHandlers={{
+                                                popupopen: () => handlePOIPopupOpen(tp.poi)
+                                            }}
                                         >
                                             <Popup minWidth={200} maxWidth={280}>
-                                                <div className="text-sm font-semibold">{tp.poi.name}</div>
+                                                <div className="text-sm font-semibold">{tp.poi.translated_name || tp.poi.name}</div>
                                                 <div className="text-xs text-slate-600 mt-1 leading-relaxed line-clamp-3">
-                                                    {tp.poi.description.slice(0, 150)}{tp.poi.description.length > 150 ? '...' : ''}
+                                                    {(tp.poi.translated_description || tp.poi.description).slice(0, 150)}
+                                                    {(tp.poi.translated_description || tp.poi.description).length > 150 ? '...' : ''}
                                                 </div>
                                             </Popup>
                                         </Marker>
@@ -487,10 +512,14 @@ export default function GuidedTour() {
                                     {status === 'current' ? (
                                         <div className="bg-white rounded-xl p-4 shadow-sm border border-primary\/20 mb-4 animate-fade-slide-left">
                                             <div className="flex items-center justify-between mb-2">
-                                                <h4 className="text-slate-900 font-bold text-sm">{index + 1}. {tp.poi.name}</h4>
+                                                <h4 className="text-slate-900 font-bold text-sm">
+                                                    {index + 1}. {tp.poi.translated_name || tp.poi.name}
+                                                </h4>
                                                 <span className="material-symbols-outlined text-primary text-lg">expand_less</span>
                                             </div>
-                                            <p className="text-slate-500 text-xs mb-3 leading-relaxed">{tp.poi.description || t('tour.defaultDescription')}</p>
+                                            <p className="text-slate-500 text-xs mb-3 leading-relaxed">
+                                                {tp.poi.translated_description || tp.poi.description || t('tour.defaultDescription')}
+                                            </p>
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
                                                     <span className="px-2.5 py-1 bg-primary\/10 text-primary text-[10px] font-bold rounded-full">
@@ -513,7 +542,7 @@ export default function GuidedTour() {
                                         <div className="flex items-center justify-between pb-5">
                                             <div className="flex flex-col">
                                                 <h4 className={`font-semibold text-sm ${status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                                                    {index + 1}. {tp.poi.name}
+                                                    {index + 1}. {tp.poi.translated_name || tp.poi.name}
                                                 </h4>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className="flex items-center gap-0.5 text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">
@@ -543,8 +572,12 @@ export default function GuidedTour() {
             {activeTab === 'overview' && (
                 <div className="px-4 py-4 animate-fade-slide-up">
                     <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-                        <h3 className="text-lg font-bold text-slate-900 mb-2">{selectedTour.name}</h3>
-                        <p className="text-slate-500 text-sm leading-relaxed">{selectedTour.description}</p>
+                        <h3 className="text-lg font-bold text-slate-900 mb-2">
+                            {selectedTour.translated_name?.[i18n.language] || selectedTour.name}
+                        </h3>
+                        <p className="text-slate-500 text-sm leading-relaxed">
+                            {selectedTour.translated_description?.[i18n.language] || selectedTour.description}
+                        </p>
                         <div className="flex gap-4 mt-4">
                             <div className="flex items-center gap-1.5 text-sm text-slate-500">
                                 <span className="material-symbols-outlined text-primary text-base" style={{ fontVariationSettings: "'FILL' 1" }}>schedule</span>
@@ -638,7 +671,7 @@ export default function GuidedTour() {
 
             {/* Narration Bottom Sheet Overlay */}
             {narrationData && (
-                <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/20 backdrop-blur-sm">
+                <div key={narrationData.poi.id} className="absolute inset-0 z-30 flex flex-col justify-end bg-black/20 backdrop-blur-sm">
                     <NarrationBottomSheet
                         poi={narrationData.poi}
                         media={narrationData.media}
@@ -654,12 +687,10 @@ export default function GuidedTour() {
                     onClose={() => setShowReviewForm(false)}
                     onSubmit={async (rating, comment) => {
                         await addReview({
-                            tour_id: selectedTour.id,
-                            user_id: user?.id || 'anonymous',
-                            user_name: t('review.anonymous', { defaultValue: 'Khách du lịch' }),
+                            tour: Number(selectedTour.id),
                             rating,
                             comment,
-                        });
+                        } as any);
                         // Xóa cờ đã review để hiện popup cảm ơn (tùy chọn UI sau này)
                     }}
                 />

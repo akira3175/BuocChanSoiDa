@@ -24,26 +24,7 @@ GTTS_LANG_MAP = {
 }
 
 
-def _translate(text: str, target_lang: str) -> str:
-    """
-    Dịch text từ 'vi' sang target_lang bằng deep-translator.
-    Yêu cầu: pip install deep-translator beautifulsoup4
-    """
-    if not text or not text.strip():
-        return ''
-    if target_lang == 'vi':
-        return text
-
-    # GoogleTranslator dùng 'zh-CN' (giản thể) hoặc 'zh-TW' (phồn thể), không dùng 'zh'
-    engine_lang = 'zh-CN' if target_lang == 'zh' else target_lang
-
-    try:
-        from deep_translator import GoogleTranslator
-        translated = GoogleTranslator(source='vi', target=engine_lang).translate(text)
-        return translated if translated else ''
-    except Exception as e:
-        logger.warning(f'[AutoTranslate] Lỗi dịch sang {target_lang} (engine={engine_lang}): {e}')
-        return ''
+from core.utils import translate_text as _translate
 
 
 def _generate_tts_and_upload(text: str, lang: str, poi_name: str) -> str:
@@ -83,6 +64,9 @@ def _generate_tts_and_upload(text: str, lang: str, poi_name: str) -> str:
 
         url = result.get('secure_url', '')
         if url:
+            version = result.get('version', '')
+            if version:
+                url = f"{url}?v={version}"
             logger.info(f'[TTS] Uploaded {lang} audio for POI "{poi_name}" → {url}')
         return url
 
@@ -94,14 +78,18 @@ def _generate_tts_and_upload(text: str, lang: str, poi_name: str) -> str:
 # ─── 1. Khi POI được lưu (Tạo mới hoặc Sửa) ──────────────────────────────────
 @receiver(pre_save, sender='pois.POI')
 def track_poi_changes(sender, instance, **kwargs):
-    """Lưu lại description cũ để so sánh trong post_save."""
+    """Lưu lại name và description cũ để so sánh trong post_save."""
     if instance.pk:
         try:
             from pois.models import POI
-            instance._old_description = POI.objects.only('description').get(pk=instance.pk).description
+            old_obj = POI.objects.only('name', 'description').get(pk=instance.pk)
+            instance._old_name = old_obj.name
+            instance._old_description = old_obj.description
         except Exception:
+            instance._old_name = None
             instance._old_description = None
     else:
+        instance._old_name = None
         instance._old_description = None
 
 
@@ -117,16 +105,28 @@ def handle_poi_translations(sender, instance, created, **kwargs):
         return
 
     from pois.models import Media
+    old_name = getattr(instance, '_old_name', None)
     old_desc = getattr(instance, '_old_description', None)
-    is_changed = (old_desc != instance.description) or created
+    is_changed = (old_desc != instance.description) or (old_name != instance.name) or created
 
-    # Tạo Media TTS cho tiếng Việt gốc (nếu chưa có)
-    vi_media, vi_created = Media.objects.get_or_create(
+    # Tìm hoặc tạo Media TTS cho tiếng Việt gốc
+    vi_media = Media.objects.filter(
         poi=instance,
         language='vi',
-        media_type=Media.MediaType.TTS,
-        defaults={'status': Media.Status.ACTIVE, 'tts_content': instance.description}
-    )
+        media_type=Media.MediaType.TTS
+    ).first()
+    
+    vi_created = False
+    if not vi_media:
+        vi_media = Media.objects.create(
+            poi=instance,
+            language='vi',
+            media_type=Media.MediaType.TTS,
+            status=Media.Status.ACTIVE,
+            tts_content=instance.description
+        )
+        vi_created = True
+
     if vi_created or is_changed or not vi_media.tts_content:
         vi_media.tts_content = instance.description
         vi_media.save(update_fields=['tts_content'])
@@ -140,20 +140,37 @@ def handle_poi_translations(sender, instance, created, **kwargs):
 
     # Xử lý các ngôn ngữ mặc định khác
     for lang in DEFAULT_LANGS:
-        media, media_created = Media.objects.get_or_create(
+        media = Media.objects.filter(
             poi=instance,
             language=lang,
-            media_type=Media.MediaType.TTS,
-            defaults={'status': Media.Status.ACTIVE}
-        )
+            media_type=Media.MediaType.TTS
+        ).first()
 
-        # Dịch tts_content nếu cần
-        needs_translate = media_created or is_changed or not media.tts_content
+        media_created = False
+        if not media:
+            media = Media.objects.create(
+                poi=instance,
+                language=lang,
+                media_type=Media.MediaType.TTS,
+                status=Media.Status.ACTIVE
+            )
+            media_created = True
+
+        # Dịch tts_content và translated_name nếu cần
+        needs_translate = media_created or is_changed or not media.tts_content or not media.translated_name
         if needs_translate:
-            translated = _translate(instance.description, lang)
-            if translated:
-                media.tts_content = translated
-                media.save(update_fields=['tts_content'])
+            # Dịch mô tả (cho TTS)
+            translated_desc = _translate(instance.description, lang)
+            if translated_desc:
+                media.tts_content = translated_desc
+            
+            # Dịch tên
+            translated_name = _translate(instance.name, lang)
+            if translated_name:
+                media.translated_name = translated_name
+            
+            if translated_desc or translated_name:
+                media.save(update_fields=['tts_content', 'translated_name'])
                 logger.info(f'[AutoTranslate] Updated {lang} for POI: {instance.name}')
 
         # Sinh TTS audio nếu cần (mới tạo, description thay đổi, hoặc chưa có file)
@@ -165,25 +182,46 @@ def handle_poi_translations(sender, instance, created, **kwargs):
                 media.save(update_fields=['file_url'])
 
 
-# ─── 2. Hỗ trợ trường hợp tạo Media thủ công trong Admin ─────────────────────
+# ─── 2. Hỗ trợ trường hợp cập nhật Media thủ công trong Admin ─────────────────
+@receiver(pre_save, sender='pois.Media')
+def track_media_changes(sender, instance, **kwargs):
+    """Lưu lại tts_content cũ để so sánh trong post_save."""
+    if instance.pk:
+        try:
+            from pois.models import Media
+            instance._old_tts_content = Media.objects.only('tts_content').get(pk=instance.pk).tts_content
+        except Exception:
+            instance._old_tts_content = None
+    else:
+        instance._old_tts_content = None
+
+
 @receiver(post_save, sender='pois.Media')
-def translate_manual_media(sender, instance, created, **kwargs):
-    """Nếu Admin tạo tay 1 bản Media TTS mà để trống nội dung -> tự dịch + sinh TTS."""
-    if (
-        instance.media_type == 'TTS'
-        and not instance.tts_content
-        and instance.language != 'vi'
-        and instance.poi.description
-    ):
+def handle_manual_media_updates(sender, instance, created, **kwargs):
+    """
+    1. Nếu Admin để trống tts_content + không phải 'vi' -> Tự dịch.
+    2. Nếu tts_content thay đổi (hoặc mới) -> Sinh lại TTS audio.
+    """
+    if instance.media_type != 'TTS':
+        return
+
+    from pois.models import Media
+    old_tts = getattr(instance, '_old_tts_content', None)
+    is_changed = (old_tts != instance.tts_content) or created
+
+    # Trường hợp 1: Tự động dịch nếu để trống
+    if not instance.tts_content and instance.language != 'vi' and instance.poi.description:
         translated = _translate(instance.poi.description, instance.language)
         if translated:
-            from pois.models import Media
             Media.objects.filter(pk=instance.pk).update(tts_content=translated)
+            instance.tts_content = translated # Cập nhật instance để dùng bên dưới
+            is_changed = True # Coi như thay đổi để sinh TTS
             logger.info(f'[AutoTranslate] Manual Media #{instance.pk} ({instance.language}) translated.')
 
-            # Sinh TTS audio cho bản dịch vừa tạo
-            if not instance.file_url:
-                url = _generate_tts_and_upload(translated, instance.language, instance.poi.name)
-                if url:
-                    Media.objects.filter(pk=instance.pk).update(file_url=url)
-                    logger.info(f'[TTS] Manual Media #{instance.pk} ({instance.language}) TTS uploaded.')
+    # Trường hợp 2: Sinh TTS audio nếu nội dung thay đổi hoặc chưa có file
+    if (is_changed or not instance.file_url) and instance.tts_content:
+        url = _generate_tts_and_upload(instance.tts_content, instance.language, instance.poi.name)
+        if url:
+            # Update trực tiếp để tránh loop
+            Media.objects.filter(pk=instance.pk).update(file_url=url)
+            logger.info(f'[TTS] Media #{instance.pk} ({instance.language}) audio updated.')

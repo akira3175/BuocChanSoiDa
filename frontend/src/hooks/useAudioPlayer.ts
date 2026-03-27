@@ -6,6 +6,8 @@ export function unlockAudioAndTTS() {
     if (typeof window !== 'undefined') {
         // Unlock TTS
         if ('speechSynthesis' in window) {
+            // Warmup voices
+            window.speechSynthesis.getVoices();
             const utterance = new SpeechSynthesisUtterance('');
             utterance.volume = 0;
             window.speechSynthesis.speak(utterance);
@@ -20,6 +22,19 @@ export function unlockAudioAndTTS() {
             }).catch(() => { /* ignore */ });
         }
     }
+}
+
+// Global unlock on first interaction
+if (typeof window !== 'undefined') {
+    const unlock = () => {
+        unlockAudioAndTTS();
+        window.removeEventListener('mousedown', unlock);
+        window.removeEventListener('touchstart', unlock);
+        window.removeEventListener('keydown', unlock);
+    };
+    window.addEventListener('mousedown', unlock);
+    window.addEventListener('touchstart', unlock);
+    window.addEventListener('keydown', unlock);
 }
 
 interface UseAudioPlayerOptions {
@@ -66,10 +81,33 @@ export function useAudioPlayer({ onEnded, onTimeUpdate }: UseAudioPlayerOptions 
         return globalAudio as HTMLAudioElement;
     }, []);
 
-    const load = useCallback((url: string) => {
+    const blobUrlRef = useRef<string | null>(null);
+
+    const load = useCallback(async (url: string) => {
         isTTSRef.current = false;
         const audio = getAudio();
-        audio.src = url;
+        
+        // Revoke old blob URL if exists
+        if (blobUrlRef.current) {
+            URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = null;
+        }
+
+        let finalUrl = url;
+        try {
+            // Check for offline blob
+            const { getMediaBlob } = await import('../services/offlineStorage');
+            const blob = await getMediaBlob(url);
+            if (blob) {
+                blobUrlRef.current = URL.createObjectURL(blob);
+                finalUrl = blobUrlRef.current;
+                console.log('Using offline audio for:', url);
+            }
+        } catch (error) {
+            console.warn('Failed to load offline audio, falling back to network:', error);
+        }
+
+        audio.src = finalUrl;
         audio.load();
         updateCurrentTime(0);
         updateDuration(0);
@@ -197,6 +235,13 @@ export function useAudioPlayer({ onEnded, onTimeUpdate }: UseAudioPlayerOptions 
     const speakTTS = useCallback((text: string, lang = 'vi-VN') => {
         if (!('speechSynthesis' in window)) return;
         
+        // Đôi khi voices chưa load kịp, retry nhẹ
+        if (window.speechSynthesis.getVoices().length === 0) {
+            console.log('Voices not loaded, retrying speakTTS in 100ms...');
+            setTimeout(() => speakTTS(text, lang), 100);
+            return;
+        }
+
         isTTSRef.current = true;
         ttsTextRef.current = text;
         ttsLangRef.current = lang;
@@ -237,6 +282,10 @@ export function useAudioPlayer({ onEnded, onTimeUpdate }: UseAudioPlayerOptions 
             audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
             audio.removeEventListener('ended', handleEnded);
             audio.pause();
+            if (blobUrlRef.current) {
+                URL.revokeObjectURL(blobUrlRef.current);
+                blobUrlRef.current = null;
+            }
             if (ttsTimerRef.current !== null) window.clearInterval(ttsTimerRef.current);
             window.speechSynthesis.cancel();
         };

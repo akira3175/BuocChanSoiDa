@@ -1,7 +1,6 @@
 from rest_framework import serializers
-from django.db.models import Max
-
-from .models import Tour, Tour_POI
+from django.db.models import Max, Avg
+from .models import Tour, Tour_POI, TourReview
 from pois.serializers import POIListSerializer
 
 
@@ -18,6 +17,8 @@ class TourSerializer(serializers.ModelSerializer):
     """Serializer cho model Tour."""
     name = serializers.CharField(source='tour_name')
     pois = serializers.SerializerMethodField()
+    average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
 
     def get_pois(self, obj):
         mappings = (
@@ -26,21 +27,31 @@ class TourSerializer(serializers.ModelSerializer):
             .select_related('poi')
             .order_by('sequence_order')
         )
-        return TourPOIInlineSerializer(mappings, many=True).data
+        return TourPOIInlineSerializer(mappings, many=True, context=self.context).data
+
+    def get_average_rating(self, obj):
+        return obj.reviews.aggregate(Avg('rating'))['rating__avg'] or 0.0
+
+    def get_review_count(self, obj):
+        return obj.reviews.count()
 
     class Meta:
         model = Tour
         fields = [
             'id',
             'name',
+            'translated_name',
             'description',
+            'translated_description',
             'status',
             'is_suggested',
             'estimated_duration_min',
             'pois',
             'created_by',
+            'average_rating',
+            'review_count',
         ]
-        read_only_fields = ['id', 'created_by', 'pois']
+        read_only_fields = ['id', 'created_by', 'pois', 'average_rating', 'review_count']
 
 
 class TourPOISerializer(serializers.ModelSerializer):
@@ -90,3 +101,19 @@ class TourPOISerializer(serializers.ModelSerializer):
             'id', 'tour', 'poi', 'sequence_order', 'status'
         ]
         read_only_fields = ['id']
+
+
+class TourReviewSerializer(serializers.ModelSerializer):
+    """Serializer cho model TourReview."""
+    tour = serializers.PrimaryKeyRelatedField(queryset=Tour.objects.all())
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+
+    class Meta:
+        model = TourReview
+        fields = [
+            'id', 'tour', 'user', 'user_email', 'username', 
+            'rating', 'comment', 'created_at'
+        ]
+        read_only_fields = ['id', 'user', 'created_at']
+

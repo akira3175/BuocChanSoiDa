@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import AppLayout from '../components/AppLayout';
-import type { Tour } from '../types';
+import type { Tour, Language } from '../types';
 import { getTourById } from '../services/api';
 import { getOfflineTourById } from '../services/offlineStorage';
+import ReviewSection from '../components/ReviewSection';
 
 export default function TourDetail() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { tourId = '' } = useParams();
     const navigate = useNavigate();
 
@@ -51,21 +52,25 @@ export default function TourDetail() {
         return (
             <AppLayout title={t('tour.title')}>
                 <div className="px-4 py-10 text-center">
-                    <p className="text-slate-600 font-semibold">Không tìm thấy tour</p>
+                    <p className="text-slate-600 font-semibold">{t('tour.notFound')}</p>
                     <button
                         onClick={() => navigate('/tours')}
                         className="mt-4 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white"
                     >
-                        Quay lại lộ trình
+                        {t('tour.backToRoutes')}
                     </button>
                 </div>
             </AppLayout>
         );
     }
 
+    const currentLang = i18n.language as Language;
+    const translatedTourName = tour.translated_name?.[currentLang] || tour.name;
+    const translatedTourDesc = tour.translated_description?.[currentLang] || tour.description || t('tour.defaultDescription');
+
     return (
         <AppLayout
-            title={tour.name}
+            title={translatedTourName}
             headerAction={
                 <button
                     onClick={() => navigate('/tours')}
@@ -77,8 +82,8 @@ export default function TourDetail() {
         >
             <div className="px-4 py-4 space-y-4">
                 <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                    <h2 className="text-base font-bold text-slate-900">{tour.name}</h2>
-                    <p className="mt-2 text-sm text-slate-500 leading-relaxed">{tour.description || t('tour.defaultDescription')}</p>
+                    <h2 className="text-base font-bold text-slate-900">{translatedTourName}</h2>
+                    <p className="mt-2 text-sm text-slate-500 leading-relaxed">{translatedTourDesc}</p>
                     <div className="mt-3 flex items-center gap-3 text-xs text-slate-500">
                         <span>{orderedPOIs.length} {t('common.points')}</span>
                         <span>•</span>
@@ -87,14 +92,18 @@ export default function TourDetail() {
                 </div>
 
                 <div>
-                    <h3 className="mb-2 text-sm font-bold text-slate-700">POI liên quan</h3>
+                    <h3 className="mb-2 text-sm font-bold text-slate-700">{t('tour.relatedPOIs')}</h3>
                     <div className="space-y-2">
                         {orderedPOIs.map((item) => (
                             <div key={`${tour.id}-${item.poi.id}`} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
                                 <div className="flex items-start justify-between gap-2">
                                     <div>
-                                        <p className="text-sm font-bold text-slate-900">#{item.sequence_order} {item.poi.name}</p>
-                                        <p className="mt-1 text-xs text-slate-500 leading-relaxed">{item.poi.description}</p>
+                                        <p className="text-sm font-bold text-slate-900">
+                                            #{item.sequence_order} {item.poi.translated_name || item.poi.name}
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                                            {item.poi.translated_description || item.poi.description}
+                                        </p>
                                     </div>
                                     <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold text-primary">
                                         ID {item.poi.id}
@@ -104,6 +113,9 @@ export default function TourDetail() {
                         ))}
                     </div>
                 </div>
+
+                {/* Review Section */}
+                <ReviewSection tourId={tourId} />
             </div>
         </AppLayout>
     );

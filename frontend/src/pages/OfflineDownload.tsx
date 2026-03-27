@@ -1,120 +1,36 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import { PackageSkeleton, staggerStyle } from '../components/Skeleton';
 import { useSyncQueue } from '../hooks/useSyncQueue';
-import {
-    downloadOfflinePackageByMode,
-    getAvailableOfflinePackages,
-    getOfflineDataMode,
-    OfflineDataSourceError,
-    setOfflineDataMode,
-    type OfflinePackageData,
-} from '../services/offlinePackages';
+import { 
+    savePackageToDB, 
+    deletePackageFromDB, 
+    getPackageFromDB 
+} from '../services/offlineStorage';
+import { downloadTourOfflinePackage, getAvailableOfflinePackages, OfflineDataSourceError, type OfflinePackageData } from '../services/offlinePackages';
 
-interface OfflinePackage extends OfflinePackageData {
+interface OfflinePackage {
     id: string;
     name: string;
     description: string;
+    translated_name?: Record<string, string>;
+    translated_description?: Record<string, string>;
     poi_count: number;
     size_mb: number;
     downloaded_at?: string;
     downloadProgress?: number;
+    downloadStatus?: string;
+    source?: string;
+    source_detail?: string;
 }
 
-// IndexedDB helpers cho offline storage
-const DB_NAME = 'bcsd_offline_db';
-const DB_VERSION = 1;
-const STORE_NAME = 'offline_packages';
-
-type StoredOfflinePackage = {
-    id: string;
-    data: Blob;
-    downloaded_at: string;
-    payload?: {
-        package_type?: string;
-        source?: string;
-        tour_id?: string;
-        generated_at?: string;
-        tour?: unknown;
-        tour_pois_group?: unknown;
-        tour_pois?: unknown;
-        pois?: unknown;
-    };
-    stats?: {
-        tour_pois_count: number;
-        pois_count: number;
-    };
-};
-
-function openDB(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = () => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-            }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-async function savePackageToDB(packageId: string, data: Blob): Promise<void> {
-    let payload: StoredOfflinePackage['payload'] | undefined;
-    try {
-        payload = JSON.parse(await data.text()) as StoredOfflinePackage['payload'];
-    } catch {
-        payload = undefined;
-    }
-
-    const tourPoisCount = Array.isArray(payload?.tour_pois) ? payload?.tour_pois.length : 0;
-    const poisCount = Array.isArray(payload?.pois) ? payload?.pois.length : 0;
-
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).put({
-            id: packageId,
-            data,
-            downloaded_at: new Date().toISOString(),
-            payload,
-            stats: {
-                tour_pois_count: tourPoisCount,
-                pois_count: poisCount,
-            },
-        } as StoredOfflinePackage);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
-}
-
-async function deletePackageFromDB(packageId: string): Promise<void> {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).delete(packageId);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
-}
-
-async function getPackageFromDB(packageId: string): Promise<StoredOfflinePackage | null> {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const request = tx.objectStore(STORE_NAME).get(packageId) as IDBRequest<StoredOfflinePackage | undefined>;
-        request.onsuccess = () => resolve(request.result || null);
-        request.onerror = () => reject(request.error);
-    });
-}
 
 export default function OfflineDownload() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [packages, setPackages] = useState<OfflinePackage[]>([]);
-    const [dataMode, setDataMode] = useState<'api' | 'mock'>(getOfflineDataMode());
     const [dataError, setDataError] = useState<string | null>(null);
     const [downloadError, setDownloadError] = useState<string | null>(null);
     const { getPendingCount, flush } = useSyncQueue();
@@ -162,7 +78,7 @@ export default function OfflineDownload() {
             setLoading(false);
         };
         init();
-    }, [getPendingCount, dataMode]);
+    }, [getPendingCount]);
 
     // Periodic update pending count
     useEffect(() => {
@@ -172,37 +88,56 @@ export default function OfflineDownload() {
 
     const handleDownload = useCallback(async (pkg: OfflinePackage) => {
         setDownloadError(null);
-        setPackages(prev => prev.map(p => p.id === pkg.id ? { ...p, downloadProgress: 0 } : p));
+        setPackages(prev => prev.map(p => p.id === pkg.id ? { ...p, downloadProgress: 5, downloadStatus: 'Đang tải metadata...' } : p));
 
         let blob: Blob;
         try {
-            blob = await downloadOfflinePackageByMode(pkg.id);
+            blob = await downloadTourOfflinePackage(pkg.id);
         } catch {
-            setPackages(prev => prev.map(p => p.id === pkg.id ? { ...p, downloadProgress: undefined } : p));
-            setDownloadError(
-                dataMode === 'api'
-                    ? 'Tải gói thất bại từ API. Hãy kiểm tra backend hoặc chuyển sang MOCK để test.'
-                    : 'Tải gói thất bại.'
-            );
+            setPackages(prev => prev.map(p => p.id === pkg.id ? { ...p, downloadProgress: undefined, downloadStatus: undefined } : p));
+            setDownloadError('Tải gói thất bại từ API. Hãy kiểm tra backend.');
             return;
         }
 
         try {
-            // Lưu vào IndexedDB
+            // Lưu metadata vào IndexedDB
             await savePackageToDB(pkg.id, blob);
-        } catch {
-            setPackages(prev => prev.map(p => p.id === pkg.id ? { ...p, downloadProgress: undefined } : p));
-            setDownloadError('Đã tải dữ liệu nhưng lưu offline thất bại (IndexedDB). Vui lòng kiểm tra bộ nhớ trình duyệt.');
+            
+            // Extract media URLs từ blob vừa tải
+            const text = await blob.text();
+            const payload = JSON.parse(text);
+            const mediaUrls: string[] = payload.media_urls || [];
+            
+            if (mediaUrls.length > 0) {
+                setPackages(prev => prev.map(p => p.id === pkg.id ? { ...p, downloadProgress: 10, downloadStatus: `Đang tải 0/${mediaUrls.length} tệp phương tiện...` } : p));
+                
+                const { downloadMediaWithProgress } = await import('../services/offlinePackages');
+                await downloadMediaWithProgress(mediaUrls, (progress, currentUrl) => {
+                    const completed = Math.round((progress / 100) * mediaUrls.length);
+                    // Metadata chiếm 10%, media chiếm 90%
+                    const totalProgress = 10 + Math.round(progress * 0.9);
+                    
+                    setPackages(prev => prev.map(p => 
+                        p.id === pkg.id 
+                            ? { ...p, downloadProgress: totalProgress, downloadStatus: `Đang tải ${completed}/${mediaUrls.length} tệp: ${currentUrl.split('/').pop()}` } 
+                            : p
+                    ));
+                });
+            }
+        } catch (error) {
+            console.error('Offline download error:', error);
+            setPackages(prev => prev.map(p => p.id === pkg.id ? { ...p, downloadProgress: undefined, downloadStatus: undefined } : p));
+            setDownloadError('Đã tải dữ liệu nhưng lưu offline thất bại. Vui lòng kiểm tra bộ nhớ trình duyệt.');
             return;
         }
 
         setPackages(prev => {
-            const updated = prev.map(p => p.id === pkg.id ? { ...p, downloadProgress: undefined, downloaded_at: new Date().toLocaleDateString('vi-VN') } : p);
+            const updated = prev.map(p => p.id === pkg.id ? { ...p, downloadProgress: undefined, downloadStatus: undefined, downloaded_at: new Date().toLocaleDateString('vi-VN') } : p);
             localStorage.setItem('bcsd_downloaded_packages', JSON.stringify(updated.filter(p => p.downloaded_at).map(p => p.id)));
             localStorage.setItem('bcsd_offline_mode', 'true');
             return updated;
         });
-    }, [dataMode]);
+    }, []);
 
     const handleDelete = useCallback(async (pkg: OfflinePackage) => {
         // Xóa khỏi IndexedDB
@@ -217,6 +152,7 @@ export default function OfflineDownload() {
         });
     }, []);
 
+
     const handleManualSync = useCallback(async () => {
         setIsSyncing(true);
         await flush();
@@ -224,15 +160,7 @@ export default function OfflineDownload() {
         setIsSyncing(false);
     }, [flush, getPendingCount]);
 
-    const handleToggleDataMode = useCallback((mode: 'api' | 'mock') => {
-        setOfflineDataMode(mode);
-        setDataMode(mode);
-    }, []);
-
     const getSourceLabel = (pkg: OfflinePackage): string => {
-        if (pkg.source === 'mock') {
-            return 'MOCK';
-        }
         if (pkg.source_detail === 'tour-pois') {
             return 'API: TOUR_POIS';
         }
@@ -256,31 +184,11 @@ export default function OfflineDownload() {
                 </div>
             </div>
 
-            {/* Data source switch */}
-            <div className="mx-4 mt-3 animate-fade-slide-up">
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-xs font-bold text-slate-700">Nguồn dữ liệu offline</p>
-                            <p className="text-[11px] text-slate-500 mt-0.5">Chuyển nhanh giữa dữ liệu thật (API) và dữ liệu mock.</p>
-                        </div>
-                        <div className="inline-flex rounded-lg bg-slate-100 p-1">
-                            <button
-                                onClick={() => handleToggleDataMode('api')}
-                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${dataMode === 'api' ? 'bg-white text-primary shadow-sm' : 'text-slate-500'}`}
-                            >
-                                API
-                            </button>
-                            <button
-                                onClick={() => handleToggleDataMode('mock')}
-                                className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${dataMode === 'mock' ? 'bg-white text-primary shadow-sm' : 'text-slate-500'}`}
-                            >
-                                MOCK
-                            </button>
+                    <div className="inline-flex rounded-lg bg-slate-100 p-1">
+                        <div className="px-3 py-1 text-xs font-bold rounded-md bg-white text-primary shadow-sm">
+                            API
                         </div>
                     </div>
-                </div>
-            </div>
 
             {/* Downloaded indicator */}
             {hasDownloaded && (
@@ -352,7 +260,7 @@ export default function OfflineDownload() {
                 ) : packages.length === 0 ? (
                     <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center">
                         <p className="text-sm font-semibold text-slate-700">Không có gói offline từ API.</p>
-                        <p className="text-xs text-slate-500 mt-1">Hãy tạo tour/tour_pois hoặc chuyển sang chế độ MOCK.</p>
+                        <p className="text-xs text-slate-500 mt-1">Hãy tạo tour hoặc tour_pois trên trang quản trị.</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -371,9 +279,13 @@ export default function OfflineDownload() {
                                                 <span className={`material-symbols-outlined text-lg ${isDownloaded ? 'text-green-500' : 'text-primary'}`} style={{ fontVariationSettings: "'FILL' 1" }}>
                                                     {isDownloaded ? 'folder' : 'cloud_download'}
                                                 </span>
-                                                <h4 className="text-sm font-bold text-slate-900 truncate">{pkg.name}</h4>
+                                                <h4 className="text-sm font-bold text-slate-900 truncate">
+                                                    {pkg.translated_name?.[i18n.language] || pkg.name}
+                                                </h4>
                                             </div>
-                                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">{pkg.description}</p>
+                                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                                {pkg.translated_description?.[i18n.language] || pkg.description}
+                                            </p>
                                             <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400 font-medium">
                                                 <span>{pkg.poi_count} {t('common.points')}</span>
                                                 <span>•</span>
@@ -404,6 +316,10 @@ export default function OfflineDownload() {
                                     </div>
                                     {isDownloading && (
                                         <div className="mt-3">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-[10px] text-primary font-bold animate-pulse">{pkg.downloadStatus}</span>
+                                                <span className="text-[10px] text-slate-400 font-medium">{Math.round(pkg.downloadProgress || 0)}%</span>
+                                            </div>
                                             <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                                                 <div className="h-full rounded-full bg-gradient-to-r from-primary to-orange-400 transition-all duration-300 ease-out" style={{ width: `${pkg.downloadProgress}%` }} />
                                             </div>

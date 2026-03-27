@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { POI, Media, Partner } from '../types';
 import PartnerCard from './PartnerCard';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { useOfflineMedia } from '../hooks/useOfflineMedia';
 
 interface NarrationBottomSheetProps {
     poi: POI;
@@ -46,38 +47,71 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
         onClose(accumulatedDurationRef.current + dur);
     }, [onClose]);
 
-    const { isPlaying, currentTime, duration, playbackRate, load, play, pause, seek, rewind, forward, setPlaybackRate, speakTTS } = useAudioPlayer({
+    const { 
+        isPlaying, 
+        currentTime, 
+        duration, 
+        playbackRate, 
+        load, 
+        play, 
+        pause, 
+        seek, 
+        rewind, 
+        forward, 
+        setPlaybackRate, 
+        speakTTS 
+    } = useAudioPlayer({
         onEnded: phase === 'poi' ? handlePOIEnded : handlePartnerEnded,
     });
+
+    const { localUrl: poiImageUrl, isOffline: isPoiImageOffline } = useOfflineMedia(poi.image_url);
 
     // Load audio khi mount hoặc khi media/poi thay đổi
     useEffect(() => {
         if (!poi) return;
 
         // TTS language code mapping
-        const langCode = media?.language || 'vi';
-        const ttsLocale = {
+        const langCode = (media?.language || localStorage.getItem('bcsd_language') || 'vi') as string;
+        const locales: Record<string, string> = {
             vi: 'vi-VN', en: 'en-US', ja: 'ja-JP',
             ko: 'ko-KR', zh: 'zh-CN', fr: 'fr-FR',
             de: 'de-DE', es: 'es-ES', th: 'th-TH',
-        }[langCode] || 'vi-VN';
+        };
+        const ttsLocale = locales[langCode] || 'vi-VN';
 
-        if (media?.file_url) {
-            load(media.file_url);
-            play();
-        } else {
-            // Ưu tiên: tts_content (đã dịch) > poi.description (tiếng Việt)
-            const textToSpeak = media?.tts_content?.trim() || poi.description;
-            // Nếu có tts_content nhưng không phải bản tiếng Việt gốc, dùng ttsLocale của media
-            speakTTS(textToSpeak, ttsLocale);
-        }
+        const triggerAutoPlay = async () => {
+            console.log('[NarrationSheet] Triggering auto-play for:', poi.name);
+            if (media?.file_url) {
+                await load(media.file_url);
+                play();
+            } else {
+                // Ưu tiên: tts_content (đã dịch) > poi.translated_description (đã dịch từ API) > poi.description (gốc)
+                const textToSpeak = media?.tts_content?.trim() || poi.translated_description || poi.description;
+                speakTTS(textToSpeak, ttsLocale);
+            }
+        };
+
+        // Một chút delay nhỏ để đảm bảo UI/Audio Context đã sẵn sàng
+        const timer = setTimeout(triggerAutoPlay, 100);
+        return () => {
+            clearTimeout(timer);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [poi.id, media]);
 
     // Khi chuyển sang partner phase → phát partner TTS
     useEffect(() => {
         if (phase === 'partner' && partnerWithIntro?.intro_text) {
-            speakTTS(partnerWithIntro.intro_text, 'vi-VN');
+            // TTS language code mapping cho partner
+            const langCode = media?.language || 'vi';
+            const locales: Record<string, string> = {
+                vi: 'vi-VN', en: 'en-US', ja: 'ja-JP',
+                ko: 'ko-KR', zh: 'zh-CN', fr: 'fr-FR',
+                de: 'de-DE', es: 'es-ES', th: 'th-TH',
+            };
+            const ttsLocale = locales[langCode] || 'vi-VN';
+            
+            speakTTS(partnerWithIntro.intro_text, ttsLocale);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [phase]);
@@ -104,19 +138,25 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
 
             {/* POI Image + Title */}
             <div className="px-4 pb-2">
-                {poi.image_url && (
-                    <div className="aspect-video w-full overflow-hidden rounded-xl mb-4">
-                        <img src={poi.image_url} alt={poi.name} className="w-full h-full object-cover" />
+                {poiImageUrl && (
+                    <div className="aspect-video w-full overflow-hidden rounded-xl mb-4 relative">
+                        <img src={poiImageUrl} alt={poi.name} className="w-full h-full object-cover" />
+                        {isPoiImageOffline && (
+                            <div className="absolute top-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-md rounded-lg flex items-center gap-1">
+                                <span className="material-symbols-outlined text-white text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud_done</span>
+                                <span className="text-[10px] text-white font-bold uppercase tracking-wider">Offline</span>
+                            </div>
+                        )}
                     </div>
                 )}
-                {!poi.image_url && (
+                {!poiImageUrl && (
                     <div className="aspect-video w-full bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl mb-4 flex items-center justify-center">
                         <span className="material-symbols-outlined text-primary text-6xl" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
                     </div>
                 )}
                 <div className="flex justify-between items-start mb-2">
                     <div className="flex-1 mr-4">
-                        <h1 className="text-[20px] font-bold text-slate-900 leading-tight">{poi.name}</h1>
+                        <h1 className="text-[20px] font-bold text-slate-900 leading-tight">{poi.translated_name || poi.name}</h1>
                         {phase === 'partner' && partnerWithIntro ? (
                             <p className="text-sm font-medium text-orange-500 mt-1 flex items-center gap-1 animate-pulse">
                                 <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>store</span>
@@ -137,7 +177,7 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
                 {/* 📝 Main Introduction Text (Translated) */}
                 <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-100">
                     <p className="text-sm text-slate-700 leading-relaxed line-clamp-6">
-                        {media?.tts_content?.trim() || poi.description}
+                        {media?.tts_content?.trim() || poi.translated_description || poi.description}
                     </p>
                     {media?.tts_content && media.language !== 'vi' && (
                         <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between">
