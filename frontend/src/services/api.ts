@@ -33,7 +33,10 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
     timeout: 10000,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'any-value', // Bypass ngrok warning page
+    },
 });
 
 const PARTNER_AUTH_STORAGE_KEY = 'bcsd_partner_auth';

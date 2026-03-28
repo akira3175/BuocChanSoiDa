@@ -5,9 +5,9 @@ BuocChanSoiDa - Ứng dụng thuyết minh du lịch tự động
 
 from pathlib import Path
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+load_dotenv(find_dotenv())
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -18,7 +18,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-in-producti
 
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,.ngrok-free.app,.ngrok-free.dev').split(',')
+ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '.ngrok-free.app', '.ngrok-free.dev']
 
 
 # Application definition
@@ -176,6 +176,13 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF configuration for production
+CSRF_TRUSTED_ORIGINS = [
+    "https://buocchansoida.netlify.app",
+    "https://*.ngrok-free.app",
+    "https://*.ngrok-free.dev",
+]
 
 
 # Cloudinary configuration
