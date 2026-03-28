@@ -185,6 +185,14 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 
+# CORS configuration for allowed headers
+from corsheaders.defaults import default_headers
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "ngrok-skip-browser-warning",
+]
+
+
 # Cloudinary configuration
 CLOUDINARY_URL = os.getenv('CLOUDINARY_URL', '')
 

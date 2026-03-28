@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.db import migrations, models
-
+from users.models import User
 
 def add_owner_column_if_missing(apps, schema_editor):
     POI = apps.get_model('pois', 'POI')
