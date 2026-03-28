@@ -77,7 +77,7 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
         processedRef.current = true;
         setScanOk(true);
 
-        if (html5QrRef.current) {
+        if (html5QrRef.current && html5QrRef.current.isScanning) {
             html5QrRef.current.stop().catch(() => {});
         }
 
@@ -138,7 +138,9 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
 
         return () => {
             if (html5QrRef.current) {
-                html5QrRef.current.stop().catch(() => {});
+                if (html5QrRef.current.isScanning) {
+                    html5QrRef.current.stop().catch(() => {});
+                }
                 html5QrRef.current = null;
             }
         };
