@@ -50,10 +50,8 @@ interface PartnerLoginResponse {
 
 interface PartnerSignupResponse {
     message: string;
-    tokens: {
-        access: string;
-        refresh: string;
-    };
+    access: string;
+    refresh: string;
     user: PartnerAuthUser;
 }
 
@@ -77,7 +75,7 @@ export const setPartnerAuthSession = (session: PartnerAuthSession | null): void 
 
 export const isPartnerAuthenticated = (): boolean => {
     const session = getPartnerAuthSession();
-    return Boolean(session?.tokens.access);
+    return Boolean(session?.access);
 };
 
 export const getUserAuthSession = (): UserAuthSession | null => {
@@ -100,7 +98,7 @@ export const setUserAuthSession = (session: UserAuthSession | null): void => {
 
 export const isUserAuthenticated = (): boolean => {
     const session = getUserAuthSession();
-    return Boolean(session?.tokens.access);
+    return Boolean(session?.access);
 };
 
 let partnerRefreshPromise: Promise<string> | null = null;
@@ -110,8 +108,10 @@ let userRefreshPromise: Promise<string> | null = null;
 // Cơ chế Switch Logic: khi offline, request ghi (POST/PUT) vào SyncQueue,
 // request đọc (GET) trả về lỗi đặc biệt để caller dùng dữ liệu local
 apiClient.interceptors.request.use((config) => {
+    console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, config.headers);
     const isOffline = localStorage.getItem('bcsd_offline_mode') === 'true' && !navigator.onLine;
     if (isOffline) {
+        console.warn(`[API Blocked] App is in offline mode or navigator.onLine is false. Blocked: ${config.url}`);
         // Ghi requests (POST, PUT): queue vào SyncQueue thay vì gửi thẳng
         if (config.method === 'post' || config.method === 'put') {
             const syncQueue = JSON.parse(localStorage.getItem('bcsd_sync_queue') || '[]');
@@ -140,13 +140,13 @@ apiClient.interceptors.request.use((config) => {
         
     if (isPartnerRoute) {
         const session = getPartnerAuthSession();
-        if (session?.tokens.access) {
-            config.headers.Authorization = `Bearer ${session.tokens.access}`;
+        if (session?.access) {
+            config.headers.Authorization = `Bearer ${session.access}`;
         }
     } else {
         const session = getUserAuthSession();
-        if (session?.tokens.access) {
-            config.headers.Authorization = `Bearer ${session.tokens.access}`;
+        if (session?.access) {
+            config.headers.Authorization = `Bearer ${session.access}`;
         }
     }
 
@@ -192,7 +192,7 @@ apiClient.interceptors.response.use(
         if (isPartnerRoute) {
             // --- PARTNER REFRESH ---
             const session = getPartnerAuthSession();
-            if (!session?.tokens.refresh) {
+            if (!session?.refresh) {
                 setPartnerAuthSession(null);
                 return Promise.reject(error);
             }
@@ -202,13 +202,19 @@ apiClient.interceptors.response.use(
                     partnerRefreshPromise = (async () => {
                         const refreshResp = await axios.post(
                             `${API_BASE_URL}/partners/account/login/refresh/`,
-                            { refresh: session.tokens.refresh },
-                            { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+                            { refresh: session.refresh },
+                            { 
+                                headers: { 
+                                    'Content-Type': 'application/json',
+                                    'ngrok-skip-browser-warning': 'true' 
+                                }, 
+                                timeout: 10000 
+                            }
                         );
                         const newAccess = (refreshResp.data as any)?.access;
                         if (!newAccess) throw new Error('Refresh failed');
                         
-                        const nextSession: PartnerAuthSession = { ...session, tokens: { ...session.tokens, access: newAccess } };
+                        const nextSession: PartnerAuthSession = { ...session, access: newAccess };
                         setPartnerAuthSession(nextSession);
                         return newAccess;
                     })().finally(() => { partnerRefreshPromise = null; });
@@ -225,7 +231,7 @@ apiClient.interceptors.response.use(
         } else {
             // --- USER/GUEST REFRESH ---
             const session = getUserAuthSession();
-            if (!session?.tokens.refresh) {
+            if (!session?.refresh) {
                 setUserAuthSession(null);
                 return Promise.reject(error);
             }
@@ -235,13 +241,19 @@ apiClient.interceptors.response.use(
                     userRefreshPromise = (async () => {
                         const refreshResp = await axios.post(
                             `${API_BASE_URL}/users/login/refresh/`,
-                            { refresh: session.tokens.refresh },
-                            { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+                            { refresh: session.refresh },
+                            { 
+                                headers: { 
+                                    'Content-Type': 'application/json',
+                                    'ngrok-skip-browser-warning': 'true' 
+                                }, 
+                                timeout: 10000 
+                            }
                         );
                         const newAccess = (refreshResp.data as any)?.access;
                         if (!newAccess) throw new Error('Refresh failed');
                         
-                        const nextSession: UserAuthSession = { ...session, tokens: { ...session.tokens, access: newAccess } };
+                        const nextSession: UserAuthSession = { ...session, access: newAccess };
                         setUserAuthSession(nextSession);
                         return newAccess;
                     })().finally(() => { userRefreshPromise = null; });
@@ -281,10 +293,8 @@ export const loginPartner = async (payload: PartnerLoginPayload): Promise<Partne
     const { data } = await apiClient.post<PartnerLoginResponse>('/partners/account/login/', payload);
     const session: PartnerAuthSession = {
         user: data.user,
-        tokens: {
-            access: data.access,
-            refresh: data.refresh,
-        },
+        access: data.access,
+        refresh: data.refresh,
     };
     setPartnerAuthSession(session);
     return session;
@@ -300,31 +310,32 @@ export const signupPartner = async (payload: PartnerSignupPayload): Promise<Part
     const { data } = await apiClient.post<PartnerSignupResponse>('/partners/account/register/', payload);
     const session: PartnerAuthSession = {
         user: data.user,
-        tokens: {
-            access: data.tokens.access,
-            refresh: data.tokens.refresh,
-        },
+        access: data.access,
+        refresh: data.refresh,
     };
     setPartnerAuthSession(session);
     return session;
 };
 
-export const signupUserAccount = async (payload: PartnerSignupPayload): Promise<PartnerAuthSession> => {
+export const signupUserAccount = async (payload: PartnerSignupPayload): Promise<UserAuthSession> => {
     const { data } = await apiClient.post<PartnerSignupResponse>('/users/register/', payload);
     return {
-        user: data.user,
-        tokens: {
-            access: data.tokens.access,
-            refresh: data.tokens.refresh,
-        },
+        user: {
+            ...data.user,
+            device_id: (data.user as any).device_id || '',
+            preferred_language: data.user.preferred_language || 'vi', // Fallback to 'vi'
+            preferred_voice_region: data.user.preferred_voice_region || 'mien_nam' // Fallback to 'mien_nam'
+        } as User,
+        access: data.access,
+        refresh: data.refresh,
     };
 };
 
 export const logoutPartner = async (): Promise<void> => {
     const session = getPartnerAuthSession();
     try {
-        if (session?.tokens.refresh) {
-            await apiClient.post('/partners/account/logout/', { refresh: session.tokens.refresh });
+        if (session?.refresh) {
+            await apiClient.post('/partners/account/logout/', { refresh: session.refresh });
         }
     } finally {
         setPartnerAuthSession(null);

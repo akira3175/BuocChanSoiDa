@@ -23,7 +23,8 @@ export interface UserAuthTokens {
 
 export interface UserAuthSession {
     user: User;
-    tokens: UserAuthTokens;
+    access: string;
+    refresh: string;
 }
 
 export interface POI {
@@ -156,7 +157,8 @@ export interface PartnerAuthTokens {
 
 export interface PartnerAuthSession {
     user: PartnerAuthUser;
-    tokens: PartnerAuthTokens;
+    access: string;
+    refresh: string;
 }
 
 export interface PartnerLoginPayload {
