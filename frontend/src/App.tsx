@@ -46,7 +46,8 @@ export default function App() {
             <Suspense fallback={<LazyFallback />}>
               <PageTransition>
                 <Routes>
-                  <Route path="/" element={<UserAuth />} />
+                  <Route path="/" element={<Navigate to="/map" replace />} />
+                  <Route path="/login" element={<UserAuth />} />
                   <Route path="/splash" element={<SplashScreen />} />
                   <Route path="/map" element={<MapExplore />} />
                   <Route path="/tours" element={<GuidedTour />} />
@@ -58,7 +59,7 @@ export default function App() {
                   <Route path="/partner/signup" element={<PartnerSignup />} />
                   <Route path="/partner" element={<RequirePartnerAuth><PartnerPortal /></RequirePartnerAuth>} />
                   <Route path="/demo-qr" element={<DemoQR />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
+                  <Route path="*" element={<Navigate to="/map" replace />} />
                 </Routes>
               </PageTransition>
             </Suspense>
