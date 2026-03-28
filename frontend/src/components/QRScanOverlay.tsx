@@ -14,9 +14,9 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
     const navigate = useNavigate();
     const [scanOk, setScanOk] = useState(false);
     const [cameraError, setCameraError] = useState(false);
-    const [flashOn, setFlashOn] = useState(false);
     const processedRef = useRef(false);
     const html5QrRef = useRef<import('html5-qrcode').Html5Qrcode | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     // Guard chống StrictMode double-invoke
     const startedRef = useRef(false);
 
@@ -119,7 +119,6 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
 
         const startCamera = async () => {
             try {
-                // Lazy import để tránh crash nếu thư viện không load được
                 const { Html5Qrcode } = await import('html5-qrcode');
                 const html5Qr = new Html5Qrcode(containerId);
                 html5QrRef.current = html5Qr;
@@ -146,21 +145,54 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleTestScan = useCallback(async () => {
-        await handleQRResult('BCSD-POI-001');
-    }, [handleQRResult]);
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !html5QrRef.current) return;
 
-    const toggleFlash = async () => {
-        if (!html5QrRef.current) return;
+        setScanOk(true);
+        
         try {
-            // @ts-expect-error: applyVideoConstraints is not typed
-            await html5QrRef.current.applyVideoConstraints({ advanced: [{ torch: !flashOn }] });
-            setFlashOn(!flashOn);
-        } catch { /* Thiết bị không hỗ trợ flash */ }
+            // Stop camera to avoid library state conflicts while scanning file
+            if (html5QrRef.current.isScanning) {
+                await html5QrRef.current.stop().catch(() => {});
+            }
+
+            const decodedText = await html5QrRef.current.scanFile(file, true);
+            console.log(`[QR Scan] Successfully decoded from file: ${decodedText}`);
+            handleQRResult(decodedText);
+        } catch (err) {
+            console.error('[QR Scan] File scan failed:', err);
+            setScanOk(false);
+            processedRef.current = false;
+            
+            // Re-start camera if it was stopped
+            if (html5QrRef.current && !html5QrRef.current.isScanning) {
+                html5QrRef.current.start(
+                    { facingMode: 'environment' },
+                    { fps: 10, qrbox: { width: 240, height: 240 } },
+                    (decodedText) => handleQRResult(decodedText),
+                    () => { /* ignore frame failures */ }
+                ).catch(() => setCameraError(true));
+            }
+
+            const errorMsg = t('qr.invalidFile') || 'Không thể đọc mã QR từ ảnh này. Vui lòng chọn ảnh rõ nét hơn hoặc có độ tương phản tốt hơn.';
+            alert(errorMsg);
+        } finally {
+            // Reset input so the same file can be selected again if needed
+            e.target.value = '';
+        }
     };
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-between text-white overflow-hidden bg-black">
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleFileSelect} 
+            />
+
             {/* Camera container */}
             <div className="absolute inset-0">
                 <div
@@ -168,7 +200,6 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
                     className="absolute inset-0"
                     style={{ width: '100%', height: '100%' }}
                 />
-                {/* Overlay tối bao quanh khung scan */}
                 <div className="absolute inset-0 bg-black/50 pointer-events-none" />
             </div>
 
@@ -180,21 +211,16 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
                     </div>
                     <span className="text-white font-semibold text-lg drop-shadow-md">{t('common.cancel')}</span>
                 </button>
-                <div className="flex size-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-md">
-                    <span className="material-symbols-outlined text-white">help</span>
-                </div>
             </div>
 
             {/* Scan frame */}
             <div className="relative z-10 flex flex-col items-center justify-center flex-1 w-full">
                 <div className="relative size-64 sm:size-72">
-                    {/* Corner decorations */}
                     <div className="absolute -top-1 -left-1 size-10 border-t-4 border-l-4 border-primary rounded-tl-2xl" />
                     <div className="absolute -top-1 -right-1 size-10 border-t-4 border-r-4 border-primary rounded-tr-2xl" />
                     <div className="absolute -bottom-1 -left-1 size-10 border-b-4 border-l-4 border-primary rounded-bl-2xl" />
                     <div className="absolute -bottom-1 -right-1 size-10 border-b-4 border-r-4 border-primary rounded-br-2xl" />
 
-                    {/* Scan line animation */}
                     {!scanOk && !cameraError && (
                         <div className="absolute left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_12px_rgba(255,106,0,.8)] animate-scan-line" />
                     )}
@@ -212,21 +238,10 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
                     </h3>
                     <p className="text-white/70 text-sm mt-2 leading-relaxed">{t('qr.scanDescription')}</p>
 
-                    {/* Demo button — always visible (camera requires HTTPS on mobile) */}
-                    {!scanOk && (
-                        <div className="mt-4 flex flex-col items-center gap-3">
-                            {cameraError && (
-                                <p className="text-amber-300 text-xs font-medium bg-amber-500/20 border border-amber-400/30 rounded-xl px-4 py-2">
-                                    📵 Camera không khả dụng (cần HTTPS)
-                                </p>
-                            )}
-                            <button
-                                onClick={handleTestScan}
-                                className="px-8 py-3 rounded-full bg-primary text-white font-bold shadow-lg shadow-primary/40 active:scale-95 transition-transform"
-                            >
-                                {t('qr.demoScan')} · BCSD-POI-001
-                            </button>
-                        </div>
+                    {cameraError && !scanOk && (
+                        <p className="mt-4 text-amber-300 text-xs font-medium bg-amber-500/20 border border-amber-400/30 rounded-xl px-4 py-2">
+                            📵 Camera không khả dụng (cần HTTPS)
+                        </p>
                     )}
                 </div>
             </div>
@@ -235,7 +250,10 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
             <div className="relative z-20 w-full flex flex-col items-center gap-4 pb-10">
                 <div className="flex items-center justify-center gap-10">
                     <div className="flex flex-col items-center gap-2">
-                        <button className="flex size-14 items-center justify-center rounded-full bg-black/40 backdrop-blur-xl border border-white/10 text-white">
+                        <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="flex size-14 items-center justify-center rounded-full bg-black/40 backdrop-blur-xl border border-white/10 text-white active:bg-primary transition-colors"
+                        >
                             <span className="material-symbols-outlined text-3xl">image</span>
                         </button>
                         <span className="text-xs font-medium text-white/80 uppercase tracking-widest">{t('qr.gallery')}</span>
@@ -245,18 +263,6 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
                         <div className="size-full rounded-full bg-white flex items-center justify-center">
                             <span className="material-symbols-outlined text-primary text-4xl">qr_code_scanner</span>
                         </div>
-                    </div>
-
-                    <div className="flex flex-col items-center gap-2">
-                        <button
-                            onClick={toggleFlash}
-                            className={`flex size-14 items-center justify-center rounded-full backdrop-blur-xl border border-white/10 text-white transition-colors ${flashOn ? 'bg-primary' : 'bg-black/40'}`}
-                        >
-                            <span className="material-symbols-outlined text-3xl">{flashOn ? 'flashlight_on' : 'flashlight_off'}</span>
-                        </button>
-                        <span className="text-xs font-medium text-white/80 uppercase tracking-widest">
-                            {flashOn ? t('qr.flashOn') : t('qr.flashOff')}
-                        </span>
                     </div>
                 </div>
                 <div className="w-32 h-1.5 bg-white/20 rounded-full" />
