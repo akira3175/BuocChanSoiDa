@@ -35,7 +35,7 @@ const apiClient = axios.create({
     timeout: 10000,
     headers: { 
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'any-value', // Bypass ngrok warning page
+        'ngrok-skip-browser-warning': 'true', // Bypass ngrok warning page
     },
 });
 
@@ -261,7 +261,7 @@ apiClient.interceptors.response.use(
 
 // --- User endpoints ---
 export const initUser = async (deviceId: string): Promise<User> => {
-    const { data } = await apiClient.post<User>('/users/init', { device_id: deviceId });
+    const { data } = await apiClient.post<User>('/users/init/', { device_id: deviceId });
     return data;
 };
 
@@ -395,17 +395,17 @@ export const paypalCaptureOrder = async (orderId: string, invoiceId?: string): P
 
 // --- POI endpoints ---
 export const getPOIsNearMe = async (lat: number, lng: number, language = 'vi', voiceRegion = 'mien_nam', radius = 500): Promise<POI[]> => {
-    const { data } = await apiClient.get<POI[]>('/pois/near-me', { params: { lat, lng, radius, language, voice_region: voiceRegion } });
+    const { data } = await apiClient.get<POI[]>('/pois/near-me/', { params: { lat, lng, radius, language, voice_region: voiceRegion } });
     return data;
 };
 
 export const getPOIById = async (id: string): Promise<POI> => {
-    const { data } = await apiClient.get<POI>(`/pois/${id}`);
+    const { data } = await apiClient.get<POI>(`/pois/${id}/`);
     return data;
 };
 
 export const scanQRCode = async (code: string): Promise<POI> => {
-    const { data } = await apiClient.get<POI>('/pois/scan', { params: { code } });
+    const { data } = await apiClient.get<POI>('/pois/scan/', { params: { code } });
     return data;
 };
 
@@ -420,7 +420,7 @@ export const selectBestMedia = (mediaList: Media[], language: string, voiceRegio
 
 export const getPOIMedia = async (poiId: string, language: string, voiceRegion: string): Promise<Media | null> => {
     try {
-        const { data } = await apiClient.get<Media[]>(`/pois/${poiId}/media`, { params: { language, voice_region: voiceRegion } });
+        const { data } = await apiClient.get<Media[]>(`/pois/${poiId}/media/`, { params: { language, voice_region: voiceRegion } });
         return selectBestMedia(data, language, voiceRegion);
     } catch {
         return null;
@@ -429,7 +429,7 @@ export const getPOIMedia = async (poiId: string, language: string, voiceRegion: 
 
 export const getPOIPartners = async (poiId: string): Promise<Partner[]> => {
     try {
-        const { data } = await apiClient.get(`/pois/${poiId}/partners`);
+        const { data } = await apiClient.get(`/pois/${poiId}/partners/`);
         // Handle DRF pagination: { count, results: [...] } hoặc plain array
         if (Array.isArray(data)) return data as Partner[];
         if (data && Array.isArray((data as { results?: unknown }).results)) {
@@ -557,7 +557,7 @@ export const postBreadcrumbs = async (points: BreadcrumbPoint[]): Promise<void> 
 
 // --- Offline data endpoint ---
 export const downloadOfflinePackage = async (tourId: string): Promise<Blob> => {
-    const { data } = await apiClient.get<Blob>(`/offline/package/${tourId}`, { responseType: 'blob' });
+    const { data } = await apiClient.get<Blob>(`/offline/package/${tourId}/`, { responseType: 'blob' });
     return data;
 };
 
