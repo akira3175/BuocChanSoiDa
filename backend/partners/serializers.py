@@ -250,6 +250,9 @@ class PartnerProfileSerializer(serializers.ModelSerializer):
     """
 
     menu_details = serializers.JSONField(required=False)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    poi_created_at = serializers.SerializerMethodField()
+    poi_updated_at = serializers.SerializerMethodField()
 
     class Meta:
         model = Partner
@@ -263,12 +266,29 @@ class PartnerProfileSerializer(serializers.ModelSerializer):
             'opening_hours',
             'poi',
             'status',
+            'status_display',
+            'created_at',
+            'updated_at',
+            'poi_created_at',
+            'poi_updated_at',
         ]
         extra_kwargs = {
             'poi': {'required': False, 'allow_null': True},
             'qr_url': {'required': False, 'allow_blank': True},
             'menu_details': {'required': False},
+            'created_at': {'read_only': True},
+            'updated_at': {'read_only': True},
         }
+
+    def get_poi_created_at(self, obj):
+        if obj.poi_id and getattr(obj, 'poi', None):
+            return obj.poi.created_at
+        return None
+
+    def get_poi_updated_at(self, obj):
+        if obj.poi_id and getattr(obj, 'poi', None):
+            return obj.poi.updated_at
+        return None
 
 
 class PartnerChangePasswordSerializer(serializers.Serializer):

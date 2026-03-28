@@ -37,6 +37,9 @@ export interface POI {
     category: POICategory;
     qr_code_data: string;
     status?: number;
+    /** ISO 8601 từ backend */
+    created_at?: string;
+    updated_at?: string;
     distance?: number; // field inject từ near-me view (mét)
     image_url?: string;
     address?: string;
@@ -55,6 +58,14 @@ export interface Media {
     media_type_display?: string;
 }
 
+/** POST /partners/account/deactivate/ */
+export interface PartnerDeactivateResponse {
+    partner_deactivated: boolean;
+    poi_deactivated: boolean;
+    message: string;
+    profile: Partner;
+}
+
 export interface Partner {
     id: string;
     business_name: string;
@@ -64,6 +75,12 @@ export interface Partner {
     menu_details?: { must_try?: string[]; price_range?: string };
     opening_hours?: string;
     status?: number;
+    /** Nhãn trạng thái từ backend (vd. Chờ phê duyệt) */
+    status_display?: string;
+    created_at?: string;
+    updated_at?: string;
+    poi_created_at?: string | null;
+    poi_updated_at?: string | null;
     poi?: number | string | null;
 }
 

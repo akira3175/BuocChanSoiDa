@@ -6,18 +6,22 @@ from .models import Partner
 @admin.register(Partner)
 class PartnerAdmin(admin.ModelAdmin):
     list_display = [
-        'id', 'business_name', 'address', 'user', 'poi', 'opening_hours',
-        'has_intro_tts', 'status_badge',
+        'id', 'business_name', 'address', 'user', 'poi', 'poi_timestamps',
+        'opening_hours', 'has_intro_tts', 'status_badge',
     ]
     list_filter = ['status', 'poi', 'user']
     search_fields = ['business_name', 'address', 'poi__name', 'user__email', 'user__username']
     list_select_related = ['poi', 'user']
     list_per_page = 30
+    readonly_fields = ['created_at', 'updated_at']
     actions = ['mark_pending_approval', 'approve_selected', 'reject_selected']
 
     fieldsets = (
         ('Thông tin cơ sở', {
-            'fields': ('user', 'poi', 'business_name', 'address', 'opening_hours', 'status'),
+            'fields': (
+                'user', 'poi', 'business_name', 'address', 'opening_hours', 'status',
+                'created_at', 'updated_at',
+            ),
             'description': 'Flow mới: tạo Partner trước (user), POI có thể để trống và liên kết sau.',
         }),
         ('🎙️ Nội dung TTS giới thiệu', {
@@ -59,6 +63,20 @@ class PartnerAdmin(admin.ModelAdmin):
         if obj is None:
             return self.add_fieldsets
         return super().get_fieldsets(request, obj)
+
+    def poi_timestamps(self, obj):
+        if not obj.poi_id or not obj.poi:
+            return format_html('<span style="color:#999">—</span>')
+        p = obj.poi
+        c = p.created_at.strftime('%d/%m/%Y %H:%M') if getattr(p, 'created_at', None) else '—'
+        u = p.updated_at.strftime('%d/%m/%Y %H:%M') if getattr(p, 'updated_at', None) else '—'
+        return format_html(
+            '<span style="font-size:11px;line-height:1.35" title="POI liên kết">'
+            'Tạo: <b>{}</b><br/>Sửa: <b>{}</b></span>',
+            c, u,
+        )
+
+    poi_timestamps.short_description = 'POI (tạo / cập nhật)'
 
     def has_intro_tts(self, obj):
         if obj.intro_text and obj.intro_text.strip():

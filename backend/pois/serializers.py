@@ -43,6 +43,7 @@ class POIListSerializer(serializers.ModelSerializer):
             'id', 'name', 'translated_name', 'description', 'translated_description',
             'latitude', 'longitude', 'geofence_radius',
             'category', 'qr_code_data', 'status',
+            'created_at', 'updated_at',
             'distance',
         ]
 
@@ -102,6 +103,7 @@ class POIDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'translated_name', 'description', 'translated_description',
             'latitude', 'longitude', 'geofence_radius',
             'category', 'qr_code_data', 'status',
+            'created_at', 'updated_at',
             'media', 'partners',
         ]
 

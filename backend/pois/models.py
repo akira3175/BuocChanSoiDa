@@ -1,6 +1,8 @@
 import math
-from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 
@@ -45,15 +47,42 @@ class POI(models.Model):
         choices=Status.choices,
         default=Status.ACTIVE,
     )
+    created_at = models.DateTimeField('Ngày tạo', auto_now_add=True)
+    updated_at = models.DateTimeField('Cập nhật lần cuối', auto_now=True)
 
     class Meta:
         db_table = 'pois'
         verbose_name = 'Điểm tham quan'
         verbose_name_plural = 'Điểm tham quan'
         ordering = ['name']
+        constraints = [
+            # Một toạ độ chỉ có tối đa một POI đang ACTIVE; nhiều Partner có thể FK tới cùng POI đó.
+            # (Trong Meta không thể tham chiếu POI.Status — Python chỉ resolve tên ở module.)
+            models.UniqueConstraint(
+                fields=['latitude', 'longitude'],
+                condition=Q(status=1),  # Status.ACTIVE
+                name='uniq_poi_active_lat_lng',
+            ),
+        ]
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        super().clean()
+        if self.status != self.Status.ACTIVE:
+            return
+        qs = POI.objects.filter(
+            latitude=self.latitude,
+            longitude=self.longitude,
+            status=self.Status.ACTIVE,
+        )
+        if self.pk:
+            qs = qs.exclude(pk=self.pk)
+        if qs.exists():
+            raise ValidationError(
+                'Đã tồn tại POI đang hoạt động khác tại cùng vĩ độ/kinh độ.'
+            )
 
     def distance_to(self, lat: float, lng: float) -> float:
         """Tính khoảng cách Haversine từ POI tới toạ độ (lat, lng), đơn vị mét."""
@@ -210,6 +239,8 @@ class Partner(models.Model):
         choices=Status.choices,
         default=Status.PENDING_APPROVAL,
     )
+    created_at = models.DateTimeField('Ngày tạo hồ sơ', auto_now_add=True)
+    updated_at = models.DateTimeField('Cập nhật hồ sơ', auto_now=True)
 
     class Meta:
         db_table = 'partners'

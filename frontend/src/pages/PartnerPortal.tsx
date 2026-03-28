@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
-import { getApiErrorMessage, getPartnerAccountProfile, isPartnerAuthenticated, logoutPartner, upsertPartnerAccountProfile } from '../services/api';
+import {
+  deactivatePartnerAccount,
+  getApiErrorMessage,
+  getPartnerAccountProfile,
+  isPartnerAuthenticated,
+  logoutPartner,
+  upsertPartnerAccountProfile,
+} from '../services/api';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import PartnerPOI from '../components/PartnerPOI';
 
@@ -35,6 +42,30 @@ const DEFAULT_DRAFT: PartnerDraft = {
 };
 
 const QR_SCAN_PATH = '/api/pois/scan/';
+
+function formatVnDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function adminStyleStatusLabel(status: number | undefined, statusDisplay: string): string {
+  if (statusDisplay.trim()) return statusDisplay;
+  if (status === 1) return 'Hoạt động';
+  if (status === 2) return 'Chờ phê duyệt';
+  if (status === 0) return 'Bị từ chối';
+  return '—';
+}
+
+interface DistributionInfo {
+  partnerStatus: number | null;
+  partnerCreatedAt: string | null;
+  partnerUpdatedAt: string | null;
+  poiCreatedAt: string | null;
+  poiUpdatedAt: string | null;
+  statusDisplay: string;
+}
 
 function getPublicBaseUrl(): string {
   const envBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined)?.trim();
@@ -73,29 +104,8 @@ function buildOpeningHours(openAt: string, closeAt: string): string {
 const PARTNER_TABS: { id: PartnerTab; label: string; icon: string }[] = [
   { id: 'profile', label: 'Hồ sơ', icon: 'badge' },
   { id: 'poi', label: 'POI', icon: 'location_on' },
-  { id: 'distribution', label: 'Phân phối', icon: 'hub' },
+  { id: 'distribution', label: 'Tổng quan', icon: 'dashboard' },
   { id: 'analytics', label: 'Hiệu quả', icon: 'monitoring' },
-];
-
-const REVIEW_TIMELINE = [
-  {
-    title: 'Gửi bản cập nhật',
-    desc: 'Partner gửi nội dung giới thiệu và thông tin menu/giờ mở cửa.',
-    time: '09:20',
-    done: true,
-  },
-  {
-    title: 'CMS kiểm duyệt',
-    desc: 'Admin kiểm tra ngôn ngữ, chất lượng audio và tính chính xác thông tin.',
-    time: '10:05',
-    done: true,
-  },
-  {
-    title: 'Xuất bản đa kênh',
-    desc: 'Nội dung được publish cho app online/offline sau khi duyệt.',
-    time: 'Đang chờ',
-    done: false,
-  },
 ];
 
 export default function PartnerPortal() {
@@ -109,6 +119,15 @@ export default function PartnerPortal() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [partnerPoiId, setPartnerPoiId] = useState('');
+  const [distributionInfo, setDistributionInfo] = useState<DistributionInfo>({
+    partnerStatus: null,
+    partnerCreatedAt: null,
+    partnerUpdatedAt: null,
+    poiCreatedAt: null,
+    poiUpdatedAt: null,
+    statusDisplay: '',
+  });
+  const [deactivating, setDeactivating] = useState(false);
   const { isPlaying, speakTTS, pause } = useAudioPlayer();
   const publicBaseUrl = useMemo(() => getPublicBaseUrl(), []);
 
@@ -185,8 +204,21 @@ export default function PartnerPortal() {
       setSavingProfile(true);
       setProfileError('');
       try {
-        await upsertPartnerAccountProfile(payload);
+        const data = await upsertPartnerAccountProfile(payload);
         setSavedAt(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }));
+        setDistributionInfo({
+          partnerStatus: typeof data.status === 'number' ? data.status : null,
+          partnerCreatedAt: data.created_at ?? null,
+          partnerUpdatedAt: data.updated_at ?? null,
+          poiCreatedAt: data.poi_created_at ?? null,
+          poiUpdatedAt: data.poi_updated_at ?? null,
+          statusDisplay: data.status_display?.trim() ?? '',
+        });
+        if (typeof data.status === 'number') {
+          const nextApprovalStatus: ApprovalStatus =
+            data.status === 1 ? 'approved' : data.status === 2 ? 'pending' : 'needs_fix';
+          setApprovalStatus(nextApprovalStatus);
+        }
       } catch (err) {
         // giữ UX cũ: hiển thị message dưới form
         // (không import thêm util để tránh lệch style)
@@ -205,6 +237,40 @@ export default function PartnerPortal() {
     } finally {
       navigate('/partner/login?next=%2Fpartner', { replace: true });
       setLoggingOut(false);
+    }
+  };
+
+  const handleDeactivateDisplay = async () => {
+    const lines = [
+      'Bạn sắp tắt hiển thị hồ sơ đối tác (trạng thái không hoạt động).',
+      '',
+      'Nếu tài khoản của bạn là chủ sở hữu POI, điểm đó cũng sẽ được tắt.',
+      'Nếu POI dùng chung với đối tác khác, POI có thể giữ nguyên.',
+      '',
+      'Tiếp tục?',
+    ];
+    if (!window.confirm(lines.join('\n'))) return;
+    setDeactivating(true);
+    try {
+      const res = await deactivatePartnerAccount();
+      const p = res.profile;
+      setDistributionInfo({
+        partnerStatus: typeof p.status === 'number' ? p.status : null,
+        partnerCreatedAt: p.created_at ?? null,
+        partnerUpdatedAt: p.updated_at ?? null,
+        poiCreatedAt: p.poi_created_at ?? null,
+        poiUpdatedAt: p.poi_updated_at ?? null,
+        statusDisplay: p.status_display?.trim() ?? '',
+      });
+      setPartnerPoiId(p.poi ? String(p.poi) : '');
+      if (typeof p.status === 'number') {
+        setApprovalStatus(p.status === 1 ? 'approved' : p.status === 2 ? 'pending' : 'needs_fix');
+      }
+      alert(res.message);
+    } catch (err) {
+      alert(getApiErrorMessage(err, 'Không thể tắt hiển thị. Vui lòng thử lại.'));
+    } finally {
+      setDeactivating(false);
     }
   };
 
@@ -260,6 +326,14 @@ export default function PartnerPortal() {
 
         setApprovalStatus(nextApprovalStatus);
         setPartnerPoiId(data.poi ? String(data.poi) : '');
+        setDistributionInfo({
+          partnerStatus: typeof data.status === 'number' ? data.status : null,
+          partnerCreatedAt: data.created_at ?? null,
+          partnerUpdatedAt: data.updated_at ?? null,
+          poiCreatedAt: data.poi_created_at ?? null,
+          poiUpdatedAt: data.poi_updated_at ?? null,
+          statusDisplay: data.status_display?.trim() ?? '',
+        });
         setDraft((prev) => ({
           ...prev,
           businessName: data.business_name || '',
@@ -287,9 +361,40 @@ export default function PartnerPortal() {
     };
   }, [navigate]);
 
+  useEffect(() => {
+    if (activeTab !== 'distribution') return;
+    if (!isPartnerAuthenticated()) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await getPartnerAccountProfile();
+        if (cancelled) return;
+        setPartnerPoiId(data.poi ? String(data.poi) : '');
+        setDistributionInfo({
+          partnerStatus: typeof data.status === 'number' ? data.status : null,
+          partnerCreatedAt: data.created_at ?? null,
+          partnerUpdatedAt: data.updated_at ?? null,
+          poiCreatedAt: data.poi_created_at ?? null,
+          poiUpdatedAt: data.poi_updated_at ?? null,
+          statusDisplay: data.status_display?.trim() ?? '',
+        });
+        if (typeof data.status === 'number') {
+          const nextApprovalStatus: ApprovalStatus =
+            data.status === 1 ? 'approved' : data.status === 2 ? 'pending' : 'needs_fix';
+          setApprovalStatus(nextApprovalStatus);
+        }
+      } catch {
+        /* giữ state hiện tại */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
   const renderProfileTab = () => (
     <section className="mx-4 mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm animate-stagger-item">
-      <h3 className="text-base font-bold text-slate-900">1) Hồ sơ đối tác & nội dung</h3>
+      <h3 className="text-base font-bold text-slate-900">Hồ sơ đối tác & nội dung</h3>
       <p className="mt-1 text-xs text-slate-500">Quản lý hồ sơ doanh nghiệp và nội dung giới thiệu hiển thị trong ứng dụng.</p>
 
       <div className="mt-3 grid gap-3">
@@ -414,36 +519,234 @@ export default function PartnerPortal() {
     </section>
   );
 
-  const renderDistributionTab = () => (
-    <section className="mx-4 mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm animate-stagger-item">
-      <h3 className="text-base font-bold text-slate-900">3) Kiểm duyệt và phân phối</h3>
-      <p className="mt-1 text-xs text-slate-500">Theo dõi hàng chờ duyệt CMS và cách nội dung hiển thị tới người dùng tại từng POI.</p>
+  const renderDistributionTab = () => {
+    const st = distributionInfo.partnerStatus;
+    const statusAccent =
+      st === 1
+        ? 'from-emerald-500/15 via-emerald-400/5 to-transparent ring-emerald-200/80'
+        : st === 2
+          ? 'from-amber-500/15 via-amber-400/5 to-transparent ring-amber-200/80'
+          : st === 0
+            ? 'from-rose-500/15 via-rose-400/5 to-transparent ring-rose-200/80'
+            : 'from-slate-400/15 via-slate-300/5 to-transparent ring-slate-200/80';
+    const statusIcon =
+      st === 1 ? 'verified' : st === 2 ? 'hourglass_top' : st === 0 ? 'block' : 'help';
+    const statusBadgeClass =
+      st === 1
+        ? 'border-emerald-300/60 bg-emerald-50 text-emerald-900 shadow-sm shadow-emerald-500/10'
+        : st === 2
+          ? 'border-amber-300/60 bg-amber-50 text-amber-950 shadow-sm shadow-amber-500/10'
+          : st === 0
+            ? 'border-rose-300/60 bg-rose-50 text-rose-950 shadow-sm shadow-rose-500/10'
+            : 'border-slate-200 bg-slate-50 text-slate-800';
+    const statusHint =
+      st === 1
+        ? 'Admin đã duyệt — hồ sơ và nội dung liên quan có thể hiển thị theo cấu hình app.'
+        : st === 2
+          ? 'Admin chưa duyệt — vui lòng chờ hoặc cập nhật hồ sơ theo yêu cầu.'
+          : st === 0
+            ? 'Hồ sơ không được duyệt hoặc đã bị từ chối. Liên hệ quản trị nếu cần hỗ trợ.'
+            : '';
 
-      <div className="mt-3 space-y-2">
-        {REVIEW_TIMELINE.map((item, index) => (
-          <div key={item.title} className="flex items-start gap-2 rounded-xl bg-slate-50 p-2.5">
-            <div className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold text-white ${item.done ? 'bg-emerald-500' : 'bg-primary'}`}>
-              {index + 1}
+    return (
+      <section className="relative mx-4 mt-4 overflow-hidden rounded-2xl border border-slate-100/90 bg-white shadow-sm animate-stagger-item">
+        <div className="pointer-events-none absolute -right-16 -top-12 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-8 -left-10 h-32 w-32 rounded-full bg-orange-200/35 blur-2xl" />
+
+        <div className="relative border-b border-slate-100/90 bg-gradient-to-br from-white via-orange-50/40 to-white px-4 pb-4 pt-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/90 to-primary text-white shadow-md shadow-primary/25">
+              <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                dashboard
+              </span>
             </div>
-            <div className="flex-1">
-              <p className="text-xs font-bold text-slate-800">{item.title}</p>
-              <p className="text-xs text-slate-600">{item.desc}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-primary/80">Tổng quan</p>
+              <h3 className="mt-0.5 text-base font-bold leading-tight text-slate-900">Tổng quan và lộ trình hiển thị</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                Theo dõi trạng thái admin, mốc thời gian POI và hồ sơ — đồng bộ mỗi khi bạn mở tab này.
+              </p>
             </div>
-            <span className="text-[11px] font-semibold text-slate-500">{item.time}</span>
           </div>
-        ))}
-      </div>
-
-      <div className="mt-3 rounded-xl border border-slate-200 p-3">
-        <p className="text-xs font-semibold text-slate-700">Vị trí hiển thị trong app người dùng</p>
-        <div className="mt-2 space-y-2 text-xs text-slate-600">
-          <p>• Bottom sheet gợi ý đối tác khi đang phát thuyết minh.</p>
-          <p>• Đoạn intro ngắn phát ở cuối bài thuyết minh (nếu được bật).</p>
-          <p>• Thẻ menu/giờ mở cửa ưu tiên hiển thị theo POI liên kết.</p>
         </div>
-      </div>
-    </section>
-  );
+
+        <div className="relative space-y-3 p-4">
+          <div
+            className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br p-4 ring-1 ${statusAccent} border-white/60`}
+          >
+            <div className="absolute right-3 top-3 opacity-[0.07]">
+              <span className="material-symbols-outlined text-6xl text-slate-900">shield_person</span>
+            </div>
+            <div className="relative flex flex-wrap items-start gap-3">
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-white/90 ${statusBadgeClass}`}
+              >
+                <span className="material-symbols-outlined text-[22px] text-current">{statusIcon}</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Trạng thái duyệt</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${statusBadgeClass}`}
+                  >
+                    <span className="size-1.5 rounded-full bg-current opacity-70" aria-hidden />
+                    {adminStyleStatusLabel(distributionInfo.partnerStatus ?? undefined, distributionInfo.statusDisplay)}
+                  </span>
+                </div>
+                {statusHint && (
+                  <p className="mt-3 text-xs leading-relaxed text-slate-600">{statusHint}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-3.5 transition hover:border-primary/20 hover:bg-white hover:shadow-md hover:shadow-slate-200/60">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-primary shadow-sm ring-1 ring-slate-100">
+                  <span className="material-symbols-outlined text-[18px]">location_on</span>
+                </span>
+                <div>
+                  <p className="text-xs font-bold text-slate-900">POI liên kết</p>
+                  <p className="text-[10px] text-slate-500">Mốc thời gian địa điểm</p>
+                </div>
+              </div>
+              {partnerPoiId ? (
+                <ul className="mt-3 space-y-2">
+                  <li className="flex items-start justify-between gap-2 rounded-xl bg-white/80 px-2.5 py-2 ring-1 ring-slate-100/80">
+                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                      <span className="material-symbols-outlined text-[14px] text-primary/70">event</span>
+                      Tạo
+                    </span>
+                    <span className="text-right text-xs font-semibold tabular-nums text-slate-800">
+                      {formatVnDateTime(distributionInfo.poiCreatedAt)}
+                    </span>
+                  </li>
+                  <li className="flex items-start justify-between gap-2 rounded-xl bg-white/80 px-2.5 py-2 ring-1 ring-slate-100/80">
+                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                      <span className="material-symbols-outlined text-[14px] text-primary/70">update</span>
+                      Cập nhật
+                    </span>
+                    <span className="text-right text-xs font-semibold tabular-nums text-slate-800">
+                      {formatVnDateTime(distributionInfo.poiUpdatedAt)}
+                    </span>
+                  </li>
+                </ul>
+              ) : (
+                <div className="mt-3 flex flex-col items-center rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-4 text-center">
+                  <span className="material-symbols-outlined text-3xl text-slate-300">map</span>
+                  <p className="mt-2 text-xs font-medium text-slate-600">Chưa liên kết POI</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Tạo hoặc gán POI ở tab POI.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-3.5 transition hover:border-primary/20 hover:bg-white hover:shadow-md hover:shadow-slate-200/60">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-primary shadow-sm ring-1 ring-slate-100">
+                  <span className="material-symbols-outlined text-[18px]">badge</span>
+                </span>
+                <div>
+                  <p className="text-xs font-bold text-slate-900">Hồ sơ đối tác</p>
+                  <p className="text-[10px] text-slate-500">Lưu và chỉnh sửa hồ sơ</p>
+                </div>
+              </div>
+              <ul className="mt-3 space-y-2">
+                <li className="flex items-start justify-between gap-2 rounded-xl bg-white/80 px-2.5 py-2 ring-1 ring-slate-100/80">
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                    <span className="material-symbols-outlined text-[14px] text-primary/70">person_add</span>
+                    Tạo hồ sơ
+                  </span>
+                  <span className="text-right text-xs font-semibold tabular-nums text-slate-800">
+                    {formatVnDateTime(distributionInfo.partnerCreatedAt)}
+                  </span>
+                </li>
+                <li className="flex items-start justify-between gap-2 rounded-xl bg-white/80 px-2.5 py-2 ring-1 ring-slate-100/80">
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                    <span className="material-symbols-outlined text-[14px] text-primary/70">edit_calendar</span>
+                    Cập nhật gần nhất
+                  </span>
+                  <span className="text-right text-xs font-semibold tabular-nums text-slate-800">
+                    {formatVnDateTime(distributionInfo.partnerUpdatedAt)}
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-rose-200/70 bg-gradient-to-br from-rose-50/90 via-white to-white p-3.5 shadow-sm shadow-rose-100/40">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 ring-1 ring-rose-200/80">
+                  <span className="material-symbols-outlined text-[22px]">visibility_off</span>
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900">Tắt hiển thị công khai</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                    Đặt hồ sơ Partner về <span className="font-semibold text-slate-800">không hoạt động</span>. Nếu bạn là{' '}
+                    <span className="font-semibold text-slate-800">chủ sở hữu POI</span>, điểm đó cũng được tắt; nếu POI dùng
+                    chung, hệ thống có thể giữ nguyên điểm cho đối tác khác.
+                  </p>
+                  {distributionInfo.partnerStatus === 0 && (
+                    <p className="mt-2 text-[11px] font-medium text-rose-700">
+                      Hồ sơ đang không hoạt động. Để bật lại, vui lòng liên hệ quản trị viên.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={
+                  deactivating ||
+                  loadingProfile ||
+                  distributionInfo.partnerStatus === 0 ||
+                  distributionInfo.partnerStatus === null
+                }
+                onClick={() => void handleDeactivateDisplay()}
+                className="shrink-0 rounded-xl border border-rose-300/80 bg-white px-4 py-2.5 text-xs font-bold text-rose-800 shadow-sm transition hover:border-rose-400 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {deactivating ? 'Đang xử lý…' : 'Tắt hiển thị'}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-gradient-to-b from-slate-50/80 to-white p-3.5">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <span className="material-symbols-outlined text-[18px]">smartphone</span>
+              </span>
+              <div>
+                <p className="text-xs font-bold text-slate-900">Hiển thị trên app</p>
+                <p className="text-[10px] text-slate-500">Nơi khách hàng thấy thương hiệu bạn</p>
+              </div>
+            </div>
+            <ol className="mt-3 space-y-2">
+              {[
+                { n: '1', t: 'Bottom sheet gợi ý đối tác khi đang phát thuyết minh.', i: 'bottom_panel_close' },
+                { n: '2', t: 'Đoạn intro ngắn sau bài thuyết minh (nếu bật).', i: 'brand_awareness' },
+                { n: '3', t: 'Thẻ menu & giờ mở cửa theo POI liên kết.', i: 'restaurant' },
+              ].map((row) => (
+                <li
+                  key={row.n}
+                  className="flex gap-2.5 rounded-xl border border-white/60 bg-white/70 px-2.5 py-2 text-xs text-slate-600 shadow-sm shadow-slate-200/40"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[10px] font-extrabold text-primary">
+                    {row.n}
+                  </span>
+                  <span className="min-w-0 flex-1 leading-snug">
+                    <span className="mr-1 inline-flex align-middle text-primary/80">
+                      <span className="material-symbols-outlined text-[16px]">{row.i}</span>
+                    </span>
+                    {row.t}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </section>
+    );
+  };
 
   const renderAnalyticsTab = () => (
     <section className="mx-4 mt-4 mb-5 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm animate-stagger-item">

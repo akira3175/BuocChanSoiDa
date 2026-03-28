@@ -26,19 +26,20 @@ LANG_NAMES = {
 
 # ─── Forms ──────────────────────────────────────────────────────────────────
 class POIAdminForm(forms.ModelForm):
-    existing_partners = forms.ModelMultipleChoiceField(
-        queryset=Partner.objects.all(),
-        required=False,
-        label='Gán đối tác đã tồn tại',
-        help_text='Chọn các Partner đã tồn tại để liên kết vào POI này (quan hệ 1 POI - nhiều Partner).',
-        widget=admin.widgets.FilteredSelectMultiple('Partners', is_stacked=False),
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['existing_partners'].queryset = Partner.objects.all().order_by('business_name')
-        if self.instance and self.instance.pk:
-            self.fields['existing_partners'].initial = Partner.objects.filter(poi=self.instance)
+    # Đã tắt: gán Partner đã tồn tại từ màn POI — quản lý liên kết ở Partner admin / cổng Partner.
+    # existing_partners = forms.ModelMultipleChoiceField(
+    #     queryset=Partner.objects.all(),
+    #     required=False,
+    #     label='Gán đối tác đã tồn tại',
+    #     help_text='Chọn các Partner đã tồn tại để liên kết vào POI này (quan hệ 1 POI - nhiều Partner).',
+    #     widget=admin.widgets.FilteredSelectMultiple('Partners', is_stacked=False),
+    # )
+    #
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     self.fields['existing_partners'].queryset = Partner.objects.all().order_by('business_name')
+    #     if self.instance and self.instance.pk:
+    #         self.fields['existing_partners'].initial = Partner.objects.filter(poi=self.instance)
 
     class Meta:
         model = POI
@@ -77,7 +78,11 @@ class PartnerInline(admin.TabularInline):
 @admin.register(POI)
 class POIAdmin(admin.ModelAdmin):
     form = POIAdminForm
-    list_display = ['id', 'name', 'category', 'latitude', 'longitude', 'geofence_radius', 'status_badge', 'narration_count']
+    list_display = [
+        'id', 'name', 'category', 'latitude', 'longitude', 'geofence_radius',
+        'status_badge', 'created_at', 'updated_at', 'narration_count',
+    ]
+    readonly_fields = ['created_at', 'updated_at']
     list_filter = ['status', 'category']
     search_fields = ['name', 'description', 'qr_code_data']
     ordering = ['name']
@@ -88,7 +93,7 @@ class POIAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Thông tin cơ bản', {
-            'fields': ('name', 'description', 'category', 'status'),
+            'fields': ('name', 'description', 'category', 'status', 'created_at', 'updated_at'),
         }),
         ('📍 Vị trí & Geofence', {
             'description': (
@@ -102,29 +107,24 @@ class POIAdmin(admin.ModelAdmin):
             'fields': ('qr_code_data',),
             'classes': ('collapse',),
         }),
-        ('🤝 Liên kết đối tác đã tồn tại', {
-            'description': 'Không tạo Partner mới tại đây. Chỉ gán các Partner đã có vào POI này.',
-            'fields': ('existing_partners',),
-        }),
+        # ('🤝 Liên kết đối tác đã tồn tại', {
+        #     'description': 'Không tạo Partner mới tại đây. Chỉ gán các Partner đã có vào POI này.',
+        #     'fields': ('existing_partners',),
+        # }),
     )
 
-    def save_related(self, request, form, formsets, change):
-        super().save_related(request, form, formsets, change)
-        if 'existing_partners' not in form.cleaned_data:
-            return
-
-        selected_ids = set(form.cleaned_data['existing_partners'].values_list('id', flat=True))
-        current_ids = set(Partner.objects.filter(poi=form.instance).values_list('id', flat=True))
-
-        # Bỏ liên kết những partner bị bỏ chọn khỏi POI hiện tại.
-        ids_to_unlink = current_ids - selected_ids
-        if ids_to_unlink:
-            Partner.objects.filter(id__in=ids_to_unlink).update(poi=None)
-
-        # Gán POI hiện tại cho các partner được chọn.
-        ids_to_link = selected_ids - current_ids
-        if ids_to_link:
-            Partner.objects.filter(id__in=ids_to_link).update(poi=form.instance)
+    # def save_related(self, request, form, formsets, change):
+    #     super().save_related(request, form, formsets, change)
+    #     if 'existing_partners' not in form.cleaned_data:
+    #         return
+    #     selected_ids = set(form.cleaned_data['existing_partners'].values_list('id', flat=True))
+    #     current_ids = set(Partner.objects.filter(poi=form.instance).values_list('id', flat=True))
+    #     ids_to_unlink = current_ids - selected_ids
+    #     if ids_to_unlink:
+    #         Partner.objects.filter(id__in=ids_to_unlink).update(poi=None)
+    #     ids_to_link = selected_ids - current_ids
+    #     if ids_to_link:
+    #         Partner.objects.filter(id__in=ids_to_link).update(poi=form.instance)
 
     def status_badge(self, obj):
         colors = {POI.Status.ACTIVE: '#28a745', POI.Status.INACTIVE: '#dc3545'}

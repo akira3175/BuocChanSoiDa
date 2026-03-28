@@ -207,8 +207,30 @@ class PartnerMyPOIView(APIView):
         return Response(POIDetailSerializer(poi).data, status=status.HTTP_200_OK)
 
     def post(self, request):
-        # Không cho tạo trùng nếu partner đã có POI được link.
         partner = Partner.objects.filter(user=request.user).first()
+        if not partner:
+            return Response(
+                {
+                    'detail': (
+                        'Chưa có hồ sơ đối tác. Vui lòng hoàn tất đăng ký / kích hoạt hồ sơ Partner '
+                        'trước khi tạo POI.'
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        # Cho phép tạo / liên kết POI khi chờ duyệt hoặc đang hoạt động; chỉ chặn hồ sơ không hoạt động.
+        if partner.status == Partner.Status.INACTIVE:
+            return Response(
+                {
+                    'detail': (
+                        'Hồ sơ đối tác không hoạt động (bị từ chối hoặc đã tắt). '
+                        'Không thể tạo POI. Vui lòng liên hệ quản trị viên.'
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Không cho tạo trùng nếu partner đã có POI được link.
         has_linked_poi = bool(partner and partner.poi_id)
         has_owned_poi = POI.objects.filter(owner=request.user).exists()
         if has_linked_poi or has_owned_poi:
@@ -219,6 +241,32 @@ class PartnerMyPOIView(APIView):
 
         serializer = POIListSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        vd = serializer.validated_data
+        lat, lng = vd['latitude'], vd['longitude']
+        existing_active = POI.objects.filter(
+            latitude=lat,
+            longitude=lng,
+            status=POI.Status.ACTIVE,
+        ).first()
+        if existing_active:
+            if existing_active.owner_id is None:
+                existing_active.owner = request.user
+                existing_active.save(update_fields=['owner'])
+            partner.poi = existing_active
+            partner.save(update_fields=['poi'])
+            if not existing_active.qr_code_data:
+                existing_active.qr_code_data = f"POI_{existing_active.id}"
+                existing_active.save(update_fields=['qr_code_data'])
+            poi = (
+                POI.objects.filter(id=existing_active.id)
+                .prefetch_related('media', 'partners')
+                .first()
+            )
+            return Response(
+                POIDetailSerializer(poi, context={'request': request}).data,
+                status=status.HTTP_201_CREATED,
+            )
+
         poi = serializer.save(owner=request.user)
 
         # Nếu đã tồn tại Partner profile thì link luôn để /my-poi/ hoạt động theo trường poi.
@@ -230,7 +278,11 @@ class PartnerMyPOIView(APIView):
             poi.qr_code_data = f"POI_{poi.id}"
             poi.save(update_fields=['qr_code_data'])
 
-        return Response(POIDetailSerializer(poi).data, status=status.HTTP_201_CREATED)
+        poi = POI.objects.filter(id=poi.id).prefetch_related('media', 'partners').first()
+        return Response(
+            POIDetailSerializer(poi, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     def put(self, request):
         partner = Partner.objects.select_related('poi').filter(user=request.user).first()
@@ -244,8 +296,30 @@ class PartnerMyPOIView(APIView):
 
         serializer = POIListSerializer(poi, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        vd = serializer.validated_data
+        new_lat = vd.get('latitude', poi.latitude)
+        new_lng = vd.get('longitude', poi.longitude)
+        new_status = vd.get('status', poi.status)
+        if new_status == POI.Status.ACTIVE and POI.objects.filter(
+            latitude=new_lat,
+            longitude=new_lng,
+            status=POI.Status.ACTIVE,
+        ).exclude(pk=poi.pk).exists():
+            return Response(
+                {
+                    'detail': (
+                        'Đã tồn tại POI đang hoạt động khác tại cùng toạ độ (vĩ độ/kinh độ). '
+                        'Chỉ được một POI hoạt động cho mỗi điểm.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         poi = serializer.save()
-        return Response(POIDetailSerializer(poi).data, status=status.HTTP_200_OK)
+        poi = POI.objects.filter(id=poi.id).prefetch_related('media', 'partners').first()
+        return Response(
+            POIDetailSerializer(poi, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
 
     def delete(self, request):
         partner = Partner.objects.filter(user=request.user).first()

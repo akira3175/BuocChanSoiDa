@@ -8,7 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from users.permissions import IsAdmin, IsAdminOrReadOnly, IsPartner
-from pois.models import Partner
+from pois.models import POI, Partner
 
 from .serializers import (
     PartnerCRUDSerializer,
@@ -142,7 +142,7 @@ class PartnerProfileView(generics.RetrieveUpdateAPIView):
         # Partner model is linked via OneToOneField: User -> Partner (related_name='partner_profile')
         user = self.request.user
         try:
-            return user.partner_profile
+            return Partner.objects.select_related('poi').get(user=user)
         except Partner.DoesNotExist:
             # For PUT we allow "upsert" style: if partner business profile does not exist yet,
             # create it from request.data. PATCH requires fields (especially business_name).
@@ -167,6 +167,64 @@ class PartnerProfileView(generics.RetrieveUpdateAPIView):
             from rest_framework.exceptions import NotFound
 
             raise NotFound('No Partner profile found.')
+
+
+class PartnerDeactivateView(APIView):
+    """
+    POST /api/partners/account/deactivate/
+
+    Partner tự tắt hiển thị: đặt hồ sơ về không hoạt động.
+    POI liên kết chỉ bị tắt khi tài khoản hiện tại là chủ sở hữu POI (owner),
+    tránh ảnh hưởng đối tác khác cùng điểm.
+    """
+
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def post(self, request):
+        try:
+            partner = Partner.objects.select_related('poi').get(user=request.user)
+        except Partner.DoesNotExist:
+            return Response(
+                {'detail': 'Không tìm thấy hồ sơ đối tác.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if partner.status == Partner.Status.INACTIVE:
+            return Response(
+                {
+                    'detail': 'Hồ sơ đã ở trạng thái không hoạt động.',
+                    'profile': PartnerProfileSerializer(partner).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        partner.status = Partner.Status.INACTIVE
+        partner.save(update_fields=['status'])
+
+        poi_deactivated = False
+        poi_note = ''
+        if partner.poi_id and partner.poi:
+            poi = partner.poi
+            if poi.owner_id == request.user.id:
+                if poi.status != POI.Status.INACTIVE:
+                    poi.status = POI.Status.INACTIVE
+                    poi.save(update_fields=['status'])
+                poi_deactivated = True
+                poi_note = 'POI của bạn đã được đặt về không hoạt động.'
+            else:
+                poi_note = (
+                    'POI liên kết giữ nguyên (bạn không phải chủ sở hữu điểm; '
+                    'có thể có đối tác khác cùng địa điểm).'
+                )
+
+        partner = Partner.objects.select_related('poi').get(pk=partner.pk)
+        body = {
+            'partner_deactivated': True,
+            'poi_deactivated': poi_deactivated,
+            'message': poi_note or 'Đã tắt hiển thị hồ sơ đối tác.',
+            'profile': PartnerProfileSerializer(partner).data,
+        }
+        return Response(body, status=status.HTTP_200_OK)
 
 
 class PartnerChangePasswordView(APIView):

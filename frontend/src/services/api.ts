@@ -4,6 +4,7 @@ import type {
     POI,
     Media,
     Partner,
+    PartnerDeactivateResponse,
     Tour,
     TourPOIGroup,
     TourReview,
@@ -365,14 +366,48 @@ export const upsertPartnerAccountProfile = async (payload: Partial<Partner>): Pr
     return data;
 };
 
+/** Tắt hồ sơ Partner (và POI nếu bạn là chủ sở hữu POI). */
+export const deactivatePartnerAccount = async (): Promise<PartnerDeactivateResponse> => {
+    const { data } = await apiClient.post<PartnerDeactivateResponse>('/partners/account/deactivate/', {});
+    return data;
+};
+
+/** Chuẩn hoá `detail` từ DRF (string | string[] | object field errors). */
+const normalizeDrfDetail = (detail: unknown): string | null => {
+    if (detail == null) return null;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+        const parts = detail.map((x) => (typeof x === 'string' ? x : String(x)));
+        const joined = parts.filter(Boolean).join(' ');
+        return joined || null;
+    }
+    if (typeof detail === 'object') {
+        const messages: string[] = [];
+        for (const v of Object.values(detail as Record<string, unknown>)) {
+            if (typeof v === 'string') messages.push(v);
+            else if (Array.isArray(v)) {
+                for (const item of v) {
+                    if (typeof item === 'string') messages.push(item);
+                }
+            }
+        }
+        if (messages.length) return messages.join(' ');
+    }
+    return null;
+};
+
 export const getApiErrorMessage = (error: unknown, fallback = 'Có lỗi xảy ra, vui lòng thử lại.'): string => {
     if (!axios.isAxiosError(error)) return fallback;
 
+    const status = error.response?.status;
     const responseData = error.response?.data;
     if (typeof responseData === 'string') return responseData;
 
     if (responseData && typeof responseData === 'object') {
-        if ('detail' in responseData && typeof responseData.detail === 'string') return responseData.detail;
+        if ('detail' in responseData) {
+            const msg = normalizeDrfDetail((responseData as { detail: unknown }).detail);
+            if (msg) return msg;
+        }
         if ('error' in responseData && typeof responseData.error === 'string') return responseData.error;
         if ('message' in responseData && typeof responseData.message === 'string') return responseData.message;
 
@@ -381,6 +416,8 @@ export const getApiErrorMessage = (error: unknown, fallback = 'Có lỗi xảy r
         if (typeof firstField === 'string') return firstField;
     }
 
+    if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
+    if (status === 404) return 'Không tìm thấy dữ liệu.';
     return fallback;
 };
 

@@ -12,6 +12,7 @@ urlpatterns = [
     path('account/login/refresh/', TokenRefreshView.as_view(), name='account-login-refresh'),
     path('account/logout/', views.PartnerLogoutView.as_view(), name='account-logout'),
     path('account/profile/', views.PartnerProfileView.as_view(), name='account-profile'),
+    path('account/deactivate/', views.PartnerDeactivateView.as_view(), name='account-deactivate'),
     path('account/change-password/', views.PartnerChangePasswordView.as_view(), name='account-change-password'),
 
     # Partner business CRUD endpoints

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
 import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
@@ -6,7 +7,51 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import apiClient, { getApiErrorMessage } from '../services/api';
-import type { POI, POICategory } from '../types';
+import type { Media, POI, POICategory } from '../types';
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  vi: 'Tiếng Việt',
+  en: 'English',
+  ja: '日本語',
+  ko: '한국어',
+  zh: '中文',
+  fr: 'Français',
+  de: 'Deutsch',
+  es: 'Español',
+  th: 'ภาษาไทย',
+};
+
+const VOICE_REGION_LABELS: Record<string, string> = {
+  mien_nam: 'Miền Nam',
+  mien_bac: 'Miền Bắc',
+  mien_trung: 'Miền Trung',
+  usa: 'USA',
+  uk: 'UK',
+};
+
+function languageSelectLabel(code: string): string {
+  return LANGUAGE_LABELS[code] ?? code.toUpperCase();
+}
+
+function voiceRegionLabel(region: string): string {
+  if (!region) return 'Mặc định';
+  return VOICE_REGION_LABELS[region] ?? region.replace(/_/g, ' ');
+}
+
+function languageToBCP47(code: string): string {
+  const map: Record<string, string> = {
+    vi: 'vi-VN',
+    en: 'en-US',
+    ja: 'ja-JP',
+    ko: 'ko-KR',
+    zh: 'zh-CN',
+    fr: 'fr-FR',
+    de: 'de-DE',
+    es: 'es-ES',
+    th: 'th-TH',
+  };
+  return map[code] ?? `${code}-${code.toUpperCase()}`;
+}
 
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -34,8 +79,13 @@ function MapSelector({
 export default function PartnerPOI() {
   const [poi, setPoi] = useState<POI | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Thông báo nhẹ (vd. chưa có POI — không phải lỗi). */
+  const [notice, setNotice] = useState('');
+  /** Lỗi tải / lưu — hiển thị nổi bật. */
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  /** Chặn double-submit trước khi React kịp re-render (setSaving bất đồng bộ). */
+  const saveInFlightRef = useRef(false);
   const [addressText, setAddressText] = useState('');
   const [addressLoading, setAddressLoading] = useState(false);
   const [addressError, setAddressError] = useState('');
@@ -47,7 +97,10 @@ export default function PartnerPOI() {
     longitude: 106.7038,
     geofence_radius: 80,
   });
-  const { isPlaying, speakTTS, pause } = useAudioPlayer();
+  const { isPlaying, speakTTS, pause, load, play } = useAudioPlayer();
+  /** Ngôn ngữ đang xem trong danh sách media POI (combo, không hiện tất cả cùng lúc). */
+  const [poiMediaLang, setPoiMediaLang] = useState<string>('');
+  const [playingMediaId, setPlayingMediaId] = useState<string | null>(null);
 
 
 
@@ -55,6 +108,7 @@ export default function PartnerPOI() {
     const fetchMyPoi = async () => {
       setLoading(true);
       setError('');
+      setNotice('');
       try {
         const { data } = await apiClient.get<POI>('/pois/my-poi/');
         setPoi(data);
@@ -70,9 +124,10 @@ export default function PartnerPOI() {
         setPoi(null);
         const status = axios.isAxiosError(err) ? err.response?.status : undefined;
         if (status === 404) {
-          // Partner đã đăng nhập nhưng chưa có POI record (BE trả 404 "No POI found").
-          setError('Bạn chưa có POI. Hãy tạo POI để bắt đầu quản lý thuyết minh đa ngôn ngữ.');
+          setNotice('Bạn chưa có POI. Điền thông tin bên dưới và bấm lưu để tạo POI.');
+          setError('');
         } else {
+          setNotice('');
           setError(getApiErrorMessage(err, 'Không thể tải POI. Vui lòng thử lại.'));
         }
       } finally {
@@ -82,6 +137,22 @@ export default function PartnerPOI() {
 
     void fetchMyPoi();
   }, []);
+
+  const poiMediaList = useMemo(() => (Array.isArray(poi?.media) ? poi.media : []), [poi?.media]);
+  const poiMediaLanguages = useMemo(
+    () => [...new Set(poiMediaList.map((m) => m.language))].sort((a, b) => a.localeCompare(b)),
+    [poiMediaList],
+  );
+
+  useEffect(() => {
+    if (poiMediaLanguages.length === 0) {
+      setPoiMediaLang('');
+      return;
+    }
+    setPoiMediaLang((prev) =>
+      poiMediaLanguages.some((c) => c === prev) ? prev : poiMediaLanguages[0],
+    );
+  }, [poi?.id, poiMediaLanguages]);
 
   useEffect(() => {
     const lat = formData.latitude;
@@ -157,12 +228,41 @@ export default function PartnerPOI() {
   const handleTestPoiDescription = () => {
     if (isPlaying) {
       pause();
+      setPlayingMediaId(null);
     } else if (formData.description.trim()) {
+      setPlayingMediaId(null);
       speakTTS(formData.description.trim(), 'vi-VN');
     }
   };
 
+  const filteredPoiMedia = poiMediaLang
+    ? poiMediaList.filter((m) => m.language === poiMediaLang)
+    : [];
+
+  const playPoiMediaRow = async (m: Media) => {
+    if (playingMediaId === String(m.id) && isPlaying) {
+      pause();
+      setPlayingMediaId(null);
+      return;
+    }
+    pause();
+    setPlayingMediaId(String(m.id));
+    if (m.media_type === 'AUDIO' && m.file_url?.trim()) {
+      await load(m.file_url);
+      await play();
+    } else {
+      const text = (m.tts_content || formData.description || '').trim();
+      if (!text) {
+        setPlayingMediaId(null);
+        return;
+      }
+      speakTTS(text, languageToBCP47(m.language));
+    }
+  };
+
   const handleSave = async () => {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setSaving(true);
     setError('');
     try {
@@ -173,10 +273,16 @@ export default function PartnerPOI() {
         const { data } = await apiClient.post<POI>('/pois/my-poi/', formData);
         setPoi(data);
       }
+      setNotice('');
       alert('Đã lưu POI thành công.');
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể lưu POI. Vui lòng thử lại.'));
+      const msg = getApiErrorMessage(err, 'Không thể lưu POI. Vui lòng thử lại.');
+      setError(msg);
+      if (import.meta.env.DEV) {
+        console.warn('[PartnerPOI] save failed', axios.isAxiosError(err) ? err.response?.status : err, err);
+      }
     } finally {
+      saveInFlightRef.current = false;
       setSaving(false);
     }
   };
@@ -185,11 +291,56 @@ export default function PartnerPOI() {
 
 
 
+  const errorPopup =
+    typeof document !== 'undefined' &&
+    error &&
+    createPortal(
+      <div
+        className="fixed inset-0 z-[260] flex items-end justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="partner-poi-error-title"
+      >
+        <button
+          type="button"
+          className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"
+          aria-label="Đóng thông báo"
+          onClick={() => setError('')}
+        />
+        <div className="relative z-10 w-full max-w-[480px] animate-fade-slide-up rounded-2xl border border-rose-200 bg-white p-4 shadow-2xl">
+          <div className="flex gap-3">
+            <span className="material-symbols-outlined shrink-0 text-[28px] text-rose-600">error</span>
+            <div className="min-w-0 flex-1">
+              <h4 id="partner-poi-error-title" className="text-sm font-bold text-slate-900">
+                Thông báo lỗi
+              </h4>
+              <p className="mt-2 text-sm leading-relaxed text-slate-700">{error}</p>
+              <button
+                type="button"
+                onClick={() => setError('')}
+                className="mt-4 w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+              >
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+
   return (
     <section className="mx-4 mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+      {errorPopup}
       <h3 className="text-base font-bold text-slate-900">{poi ? 'POI của Partner' : 'Tạo POI cho Partner'}</h3>
-      {error && (
-        <p className="mt-2 text-xs text-slate-500">{error}</p>
+      {notice && (
+        <div
+          role="status"
+          className="mt-3 flex gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-900"
+        >
+          <span className="material-symbols-outlined shrink-0 text-[20px] text-sky-600">info</span>
+          <p className="leading-snug">{notice}</p>
+        </div>
       )}
       <div className="mt-3 grid gap-4">
         <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
@@ -297,6 +448,84 @@ export default function PartnerPOI() {
           {saving ? 'Đang lưu...' : poi ? 'Cập nhật POI' : 'Tạo POI'}
           </button>
         </div>
+
+        {poi && poiMediaList.length > 0 && (
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-3">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-slate-500">translate</span>
+                <h4 className="text-sm font-bold text-slate-900">Thuyết minh đa ngôn ngữ</h4>
+              </div>
+              <div className="min-w-[160px] flex-1 sm:flex-initial">
+                <label className="mb-1 block text-xs font-semibold text-slate-600">Ngôn ngữ</label>
+                <select
+                  value={poiMediaLang}
+                  onChange={(e) => setPoiMediaLang(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-primary"
+                >
+                  {poiMediaLanguages.map((code) => (
+                    <option key={code} value={code}>
+                      {languageSelectLabel(code)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className="mb-3 text-xs text-slate-500">
+              Chọn ngôn ngữ để xem từng bản TTS / file âm thanh. Mỗi dòng có thể là giọng miền khác nhau.
+            </p>
+            <ul className="grid gap-2">
+              {filteredPoiMedia.map((m) => {
+                const isRowPlaying = playingMediaId === String(m.id) && isPlaying;
+                const canPlayAudio = m.media_type === 'AUDIO' && Boolean(m.file_url?.trim());
+                const canPlayTts =
+                  m.media_type === 'TTS' && Boolean((m.tts_content || formData.description || '').trim());
+                const canPlay = canPlayAudio || canPlayTts;
+                return (
+                  <li
+                    key={m.id}
+                    className="rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-800">
+                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700">
+                            {m.media_type_display ?? (m.media_type === 'TTS' ? 'TTS' : 'Âm thanh')}
+                          </span>
+                          <span className="text-slate-500">{voiceRegionLabel(m.voice_region)}</span>
+                        </div>
+                        {m.media_type === 'TTS' && (m.tts_content || '').trim() ? (
+                          <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-slate-600">
+                            {m.tts_content}
+                          </p>
+                        ) : m.media_type === 'AUDIO' ? (
+                          <p className="mt-1 truncate text-xs text-slate-500" title={m.file_url}>
+                            {m.file_url ? 'File âm thanh đã tải lên' : 'Chưa có file'}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-xs text-slate-500 italic">
+                            Dùng mô tả POI nếu chưa có văn bản TTS riêng.
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!canPlay}
+                        onClick={() => void playPoiMediaRow(m)}
+                        className="flex shrink-0 items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          {isRowPlaying ? 'stop_circle' : 'play_circle'}
+                        </span>
+                        {isRowPlaying ? 'Dừng' : 'Nghe'}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {poi && (
           <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm flex flex-col items-center justify-center p-6 text-center">
