@@ -290,15 +290,10 @@ export const loginPartner = async (payload: PartnerLoginPayload): Promise<Partne
     return session;
 };
 
-export const loginUserAccount = async (payload: PartnerLoginPayload): Promise<PartnerAuthSession> => {
-    const { data } = await apiClient.post<PartnerLoginResponse>('/users/login/', payload);
-    return {
-        user: data.user,
-        tokens: {
-            access: data.access,
-            refresh: data.refresh,
-        },
-    };
+export const loginUserAccount = async (payload: PartnerLoginPayload): Promise<UserAuthSession> => {
+    const { data } = await apiClient.post<UserAuthSession>('/users/login/', payload);
+    setUserAuthSession(data);
+    return data;
 };
 
 export const signupPartner = async (payload: PartnerSignupPayload): Promise<PartnerAuthSession> => {

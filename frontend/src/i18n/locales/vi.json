@@ -10,7 +10,14 @@
     "minutes": "phút",
     "points": "điểm",
     "locations": "địa điểm",
-    "version": "Phiên bản"
+    "version": "Phiên bản",
+    "loginAccount": "Đăng nhập tài khoản",
+    "loginDescription": "Đăng nhập để đồng bộ dữ liệu của bạn trên thiết bị này.",
+    "loginSuccess": "Đăng nhập thành công!",
+    "login": "Đăng nhập",
+    "alreadyHaveAccount": "Đã có tài khoản? Đăng nhập ngay",
+    "donthaveAccount": "Chưa có tài khoản? Liên kết ngay",
+    "passwordPlaceholder": "Nhập mật khẩu của bạn"
   },
   "splash": {
     "initDevice": "Đang khởi tạo thiết bị...",

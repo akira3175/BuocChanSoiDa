@@ -10,7 +10,14 @@
         "minutes": "min",
         "points": "stops",
         "locations": "locations",
-        "version": "Version"
+        "version": "Version",
+        "loginAccount": "Log in",
+        "loginDescription": "Log in to sync your data on this device.",
+        "loginSuccess": "Login successful!",
+        "login": "Log in",
+        "alreadyHaveAccount": "Already have an account? Log in",
+        "donthaveAccount": "Don't have an account? Link it now",
+        "passwordPlaceholder": "Enter your password"
     },
     "splash": {
         "initDevice": "Initializing device...",

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { upgradeGuestAccount, getApiErrorMessage } from '../services/api';
+import { upgradeGuestAccount, loginUserAccount, getApiErrorMessage } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';
 
@@ -8,9 +8,12 @@ interface AccountUpgradeModalProps {
     onClose: () => void;
 }
 
+type ModalMode = 'upgrade' | 'login';
+
 export default function AccountUpgradeModal({ onClose }: AccountUpgradeModalProps) {
     const { t } = useTranslation();
     const { dispatch } = useApp();
+    const [mode, setMode] = useState<ModalMode>('upgrade');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -20,23 +23,38 @@ export default function AccountUpgradeModal({ onClose }: AccountUpgradeModalProp
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (password !== passwordConfirm) {
+        setError('');
+
+        if (mode === 'upgrade' && password !== passwordConfirm) {
             setError(t('settings.errorPasswordMismatch'));
             return;
         }
+
         setLoading(true);
-        setError('');
         try {
-            const session = await upgradeGuestAccount({ email, password, password_confirm: passwordConfirm });
+            const session = mode === 'upgrade' 
+                ? await upgradeGuestAccount({ email, password, password_confirm: passwordConfirm })
+                : await loginUserAccount({ email, password });
+            
             dispatch({ type: 'SET_USER', payload: session.user });
+            
+            // Clear offline state and reload to force a fresh network sync for the new user
+            localStorage.setItem('bcsd_offline_mode', 'false');
+            localStorage.removeItem('bcsd_sync_queue');
+            
             setSuccess(true);
             setTimeout(() => {
-                onClose();
-            }, 1500);
+                window.location.reload();
+            }, 1000);
         } catch (err: any) {
             setError(getApiErrorMessage(err, t('settings.errorGeneral')));
             setLoading(false);
         }
+    };
+
+    const toggleMode = () => {
+        setMode(prev => prev === 'upgrade' ? 'login' : 'upgrade');
+        setError('');
     };
 
     return createPortal(
@@ -53,13 +71,15 @@ export default function AccountUpgradeModal({ onClose }: AccountUpgradeModalProp
 
                 <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-                        admin_panel_settings
+                        {mode === 'upgrade' ? 'admin_panel_settings' : 'login'}
                     </span>
                 </div>
 
-                <h3 className="text-center text-xl font-bold text-slate-900">{t('settings.upgradeTitle')}</h3>
+                <h3 className="text-center text-xl font-bold text-slate-900">
+                    {mode === 'upgrade' ? t('settings.upgradeTitle') : t('common.loginAccount')}
+                </h3>
                 <p className="mt-2 text-center text-sm text-slate-500">
-                    {t('settings.upgradeDescription')}
+                    {mode === 'upgrade' ? t('settings.upgradeDescription') : t('common.loginDescription')}
                 </p>
 
                 {success ? (
@@ -67,7 +87,9 @@ export default function AccountUpgradeModal({ onClose }: AccountUpgradeModalProp
                         <div className="flex size-12 items-center justify-center rounded-full bg-green-100 text-green-600">
                             <span className="material-symbols-outlined text-3xl">check</span>
                         </div>
-                        <p className="font-bold text-green-600">{t('settings.upgradeSuccess')}</p>
+                        <p className="font-bold text-green-600">
+                            {mode === 'upgrade' ? t('settings.upgradeSuccess') : t('common.loginSuccess')}
+                        </p>
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -92,23 +114,26 @@ export default function AccountUpgradeModal({ onClose }: AccountUpgradeModalProp
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
-                                placeholder={t('settings.passwordMinChars')}
+                                placeholder={mode === 'upgrade' ? t('settings.passwordMinChars') : t('common.passwordPlaceholder')}
                                 disabled={loading}
                             />
                         </div>
-                        <div>
-                            <label className="mb-1 block text-xs font-bold text-slate-700">{t('settings.passwordConfirm')}</label>
-                            <input
-                                type="password"
-                                required
-                                minLength={8}
-                                value={passwordConfirm}
-                                onChange={(e) => setPasswordConfirm(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
-                                placeholder={t('settings.passwordConfirmPlaceholder')}
-                                disabled={loading}
-                            />
-                        </div>
+                        
+                        {mode === 'upgrade' && (
+                            <div>
+                                <label className="mb-1 block text-xs font-bold text-slate-700">{t('settings.passwordConfirm')}</label>
+                                <input
+                                    type="password"
+                                    required
+                                    minLength={8}
+                                    value={passwordConfirm}
+                                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                                    placeholder={t('settings.passwordConfirmPlaceholder')}
+                                    disabled={loading}
+                                />
+                            </div>
+                        )}
 
                         {error && <p className="text-center text-xs font-medium text-rose-500">{error}</p>}
 
@@ -120,9 +145,22 @@ export default function AccountUpgradeModal({ onClose }: AccountUpgradeModalProp
                             {loading ? (
                                 <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : (
-                                t('settings.complete')
+                                mode === 'upgrade' ? t('settings.complete') : t('common.login')
                             )}
                         </button>
+
+                        <div className="text-center mt-4">
+                            <button
+                                type="button"
+                                onClick={toggleMode}
+                                className="text-xs font-bold text-slate-500 hover:text-primary transition"
+                                disabled={loading}
+                            >
+                                {mode === 'upgrade' 
+                                    ? t('common.alreadyHaveAccount') 
+                                    : t('common.donthaveAccount')}
+                            </button>
+                        </div>
                     </form>
                 )}
             </div>
