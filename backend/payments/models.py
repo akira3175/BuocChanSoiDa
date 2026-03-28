@@ -36,3 +36,42 @@ class Invoice(models.Model):
 
     def __str__(self) -> str:
         return f'Invoice {self.id} - {self.status} - {self.amount}'
+
+
+class TourPurchase(models.Model):
+    """Ghi nhận việc user mua tour premium."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='tour_purchases',
+    )
+    tour = models.ForeignKey(
+        'tours.Tour',
+        on_delete=models.CASCADE,
+        related_name='purchases',
+        verbose_name='Tour',
+    )
+    invoice = models.OneToOneField(
+        Invoice,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tour_purchase',
+    )
+    purchased_at = models.DateTimeField('Ngày mua', auto_now_add=True)
+
+    class Meta:
+        db_table = 'tour_purchases'
+        verbose_name = 'Mua Tour Premium'
+        verbose_name_plural = 'Mua Tour Premium'
+        ordering = ['-purchased_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'tour'],
+                name='uniq_user_tour_purchase',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.user} - {self.tour} ({self.purchased_at})'

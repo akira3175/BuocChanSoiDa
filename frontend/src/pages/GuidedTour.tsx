@@ -12,6 +12,7 @@ import ReviewCard from '../components/ReviewCard';
 import ReviewForm from '../components/ReviewForm';
 import { GuidedTourSkeleton } from '../components/Skeleton';
 import { staggerStyle } from '../components/Skeleton';
+import PremiumTourCheckout from '../components/PremiumTourCheckout';
 import { getTours } from '../services/api';
 import { getOfflineToursFromPackages } from '../services/offlineStorage';
 import { useGeolocation } from '../hooks/useGeolocation';
@@ -131,6 +132,7 @@ export default function GuidedTour() {
     const [showMap, setShowMap] = useState(false);
     const [offRoute, setOffRoute] = useState(false);
     const [showReviewForm, setShowReviewForm] = useState(false);
+    const [showPremiumCheckout, setShowPremiumCheckout] = useState(false);
     const [narrationData, setNarrationData] = useState<{ poi: POI; media: Media | null; partners: Partner[] } | null>(null);
     const navigate = useNavigate();
 
@@ -655,18 +657,31 @@ export default function GuidedTour() {
 
             {/* Bottom CTA */}
             <div className="sticky bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background-light via-background-light/95 to-transparent">
-                <button
-                    onClick={() => { setTourStarted(!tourStarted); if (!tourStarted) setShowMap(true); }}
-                    className={`w-full flex items-center justify-center gap-2.5 rounded-2xl h-14 text-white text-base font-bold shadow-xl tap-scale transition-all ${tourStarted
-                        ? 'bg-slate-800 shadow-slate-800/20'
-                        : 'bg-primary shadow-primary\/30 animate-pulse-glow'
-                        }`}
-                >
-                    <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-                        {tourStarted ? 'stop_circle' : 'play_circle'}
-                    </span>
-                    {tourStarted ? t('tour.endTour') : t('tour.startTour')}
-                </button>
+                {selectedTour.is_premium && !selectedTour.is_unlocked ? (
+                    <button
+                        onClick={() => setShowPremiumCheckout(true)}
+                        className="w-full flex items-center justify-center gap-2.5 rounded-2xl h-14 text-white text-base font-bold shadow-xl tap-scale transition-all bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/20"
+                    >
+                        <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
+                        {t('tour.unlockPremium', { defaultValue: 'Mở khóa Premium' })}
+                        {selectedTour.premium_price ? (
+                            <span className="text-sm opacity-80">— {selectedTour.premium_price.toLocaleString('vi-VN')}₫</span>
+                        ) : null}
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => { setTourStarted(!tourStarted); if (!tourStarted) setShowMap(true); }}
+                        className={`w-full flex items-center justify-center gap-2.5 rounded-2xl h-14 text-white text-base font-bold shadow-xl tap-scale transition-all ${tourStarted
+                            ? 'bg-slate-800 shadow-slate-800/20'
+                            : 'bg-primary shadow-primary\/30 animate-pulse-glow'
+                            }`}
+                    >
+                        <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                            {tourStarted ? 'stop_circle' : 'play_circle'}
+                        </span>
+                        {tourStarted ? t('tour.endTour') : t('tour.startTour')}
+                    </button>
+                )}
             </div>
 
             {/* Narration Bottom Sheet Overlay */}
@@ -682,6 +697,24 @@ export default function GuidedTour() {
             )}
 
             {/* Review Form Modal */}
+            {/* Premium Checkout Modal */}
+            {showPremiumCheckout && selectedTour.is_premium && (
+                <PremiumTourCheckout
+                    tour={selectedTour}
+                    onClose={() => setShowPremiumCheckout(false)}
+                    onSuccess={() => {
+                        // Refresh tour list to update is_unlocked
+                        getTours()
+                            .then((data) => {
+                                setTours(data);
+                                const refreshed = data.find(t => t.id === selectedTour.id);
+                                if (refreshed) setSelectedTour(refreshed);
+                            })
+                            .catch(() => {});
+                    }}
+                />
+            )}
+
             {showReviewForm && (
                 <ReviewForm
                     onClose={() => setShowReviewForm(false)}

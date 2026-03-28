@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.db.models import Max, Avg
 from .models import Tour, Tour_POI, TourReview
 from pois.serializers import POIListSerializer
+from payments.models import TourPurchase
 
 
 class TourPOIInlineSerializer(serializers.ModelSerializer):
@@ -19,6 +20,7 @@ class TourSerializer(serializers.ModelSerializer):
     pois = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
+    is_unlocked = serializers.SerializerMethodField()
 
     def get_pois(self, obj):
         mappings = (
@@ -35,6 +37,19 @@ class TourSerializer(serializers.ModelSerializer):
     def get_review_count(self, obj):
         return obj.reviews.count()
 
+    def get_is_unlocked(self, obj):
+        """Premium tour cần mua mới unlock; tour thường luôn True."""
+        if not obj.is_premium:
+            return True
+        request = self.context.get('request')
+        if not request or not getattr(request.user, 'is_authenticated', False):
+            return False
+        return TourPurchase.objects.filter(
+            user=request.user,
+            tour=obj,
+            invoice__status='SUCCESS',
+        ).exists()
+
     class Meta:
         model = Tour
         fields = [
@@ -45,13 +60,16 @@ class TourSerializer(serializers.ModelSerializer):
             'translated_description',
             'status',
             'is_suggested',
+            'is_premium',
+            'premium_price',
             'estimated_duration_min',
             'pois',
             'created_by',
             'average_rating',
             'review_count',
+            'is_unlocked',
         ]
-        read_only_fields = ['id', 'created_by', 'pois', 'average_rating', 'review_count']
+        read_only_fields = ['id', 'created_by', 'pois', 'average_rating', 'review_count', 'is_unlocked']
 
 
 class TourPOISerializer(serializers.ModelSerializer):

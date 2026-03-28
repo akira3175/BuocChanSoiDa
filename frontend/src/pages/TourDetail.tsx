@@ -82,12 +82,32 @@ export default function TourDetail() {
         >
             <div className="px-4 py-4 space-y-4">
                 <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                    <h2 className="text-base font-bold text-slate-900">{translatedTourName}</h2>
+                    <div className="flex items-start justify-between gap-2">
+                        <h2 className="text-base font-bold text-slate-900">{translatedTourName}</h2>
+                        {tour.is_premium && (
+                            <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${
+                                tour.is_unlocked
+                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                    : 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm'
+                            }`}>
+                                <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                    {tour.is_unlocked ? 'verified' : 'workspace_premium'}
+                                </span>
+                                {tour.is_unlocked ? t('tour.unlocked', { defaultValue: 'Đã mở' }) : 'Premium'}
+                            </span>
+                        )}
+                    </div>
                     <p className="mt-2 text-sm text-slate-500 leading-relaxed">{translatedTourDesc}</p>
                     <div className="mt-3 flex items-center gap-3 text-xs text-slate-500">
                         <span>{orderedPOIs.length} {t('common.points')}</span>
                         <span>•</span>
                         <span>{tour.estimated_duration_min || '—'} {t('common.minutes')}</span>
+                        {tour.is_premium && !tour.is_unlocked && tour.premium_price ? (
+                            <>
+                                <span>•</span>
+                                <span className="font-bold text-amber-600">{tour.premium_price.toLocaleString('vi-VN')}₫</span>
+                            </>
+                        ) : null}
                     </div>
                 </div>
 

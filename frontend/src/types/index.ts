@@ -75,6 +75,9 @@ export interface Tour {
     translated_description?: Record<string, string>;
     status: 0 | 1;
     is_suggested: boolean;
+    is_premium?: boolean;
+    premium_price?: number;
+    is_unlocked?: boolean;
     estimated_duration_min?: number;
     cover_image_url?: string;
     pois: TourPOI[];

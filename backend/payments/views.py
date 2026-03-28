@@ -8,7 +8,7 @@ from rest_framework import generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Invoice
+from .models import Invoice, TourPurchase
 from .paypal import ensure_usd_payload, paypal_request
 from .serializers import InvoiceCreateSerializer, InvoiceSerializer
 
@@ -128,3 +128,100 @@ def paypal_capture_order(request, order_id: str):
             invoice.save(update_fields=['status', 'transaction_code'])
 
     return Response(result)
+
+
+# ── Premium Tour Purchase ─────────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def tour_purchase_create(request):
+    """
+    POST /api/payments/tour-purchase/
+    Body: { "tour_id": <int> }
+    Tạo Invoice + TourPurchase (PENDING) cho tour premium.
+    Trả về invoice_id để frontend dùng PayPal flow.
+    """
+    from tours.models import Tour
+
+    tour_id = request.data.get('tour_id')
+    if not tour_id:
+        return Response({'error': 'tour_id is required.'}, status=400)
+
+    tour = get_object_or_404(Tour, id=tour_id, status=Tour.Status.ACTIVE)
+
+    if not tour.is_premium:
+        return Response({'error': 'Tour này không phải Premium.'}, status=400)
+
+    if not tour.premium_price or tour.premium_price <= 0:
+        return Response({'error': 'Tour chưa thiết lập giá premium.'}, status=400)
+
+    # Kiểm tra xem đã có bản ghi TourPurchase nào chưa
+    existing = TourPurchase.objects.filter(user=request.user, tour=tour).first()
+    
+    if existing:
+        if existing.invoice and existing.invoice.status == Invoice.Status.SUCCESS:
+            return Response({'error': 'Bạn đã mua tour này rồi.', 'already_purchased': True}, status=400)
+            
+        # Nếu đang PENDING, trả về invoice cũ để tiếp tục thanh toán
+        if existing.invoice and existing.invoice.status == Invoice.Status.PENDING:
+            return Response({
+                'invoice_id': str(existing.invoice.id),
+                'tour_purchase_id': str(existing.id),
+                'amount': existing.invoice.amount,
+                'tour_name': tour.tour_name,
+            }, status=200)
+
+        # Nếu FAILED hoặc CANCELLED, tạo invoice mới và cập nhật bản ghi cũ
+        invoice = Invoice.objects.create(
+            user=request.user,
+            reason=f'Mua tour premium: {tour.tour_name}',
+            amount=tour.premium_price,
+        )
+        existing.invoice = invoice
+        existing.save(update_fields=['invoice'])
+        
+        return Response({
+            'invoice_id': str(invoice.id),
+            'tour_purchase_id': str(existing.id),
+            'amount': invoice.amount,
+            'tour_name': tour.tour_name,
+        }, status=201)
+
+    # Nếu chưa từng có, tạo mới hoàn toàn
+    invoice = Invoice.objects.create(
+        user=request.user,
+        reason=f'Mua tour premium: {tour.tour_name}',
+        amount=tour.premium_price,
+    )
+    purchase = TourPurchase.objects.create(
+        user=request.user,
+        tour=tour,
+        invoice=invoice,
+    )
+
+    return Response({
+        'invoice_id': str(invoice.id),
+        'tour_purchase_id': str(purchase.id),
+        'amount': invoice.amount,
+        'tour_name': tour.tour_name,
+    }, status=201)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def tour_purchase_check(request):
+    """
+    GET /api/payments/tour-purchase/check/?tour_id=<int>
+    Kiểm tra user đã mua tour premium chưa.
+    """
+    tour_id = request.query_params.get('tour_id')
+    if not tour_id:
+        return Response({'error': 'tour_id query param is required.'}, status=400)
+
+    purchased = TourPurchase.objects.filter(
+        user=request.user,
+        tour_id=tour_id,
+        invoice__status='SUCCESS',
+    ).exists()
+
+    return Response({'purchased': purchased})

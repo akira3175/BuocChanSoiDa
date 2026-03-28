@@ -40,6 +40,11 @@ class Tour(models.Model):
         verbose_name='Người tạo'
     )
     is_suggested = models.BooleanField('Tour đề xuất', default=False)
+    is_premium = models.BooleanField('Tour Premium', default=False,
+        help_text='Đánh dấu tour cần trả phí mở khóa')
+    premium_price = models.PositiveBigIntegerField(
+        'Giá Premium (VND)', default=0, blank=True,
+        help_text='Giá mở khóa tour premium (đơn vị VND). Bỏ trống hoặc 0 nếu miễn phí.')
     status = models.IntegerField(
         'Trạng thái',
         choices=Status.choices,

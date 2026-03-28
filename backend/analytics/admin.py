@@ -22,8 +22,9 @@ def get_active_users_count(minutes: int = 15) -> int:
 
 
 def get_today_narration_count() -> int:
-    today = timezone.now().date()
-    return NarrationLog.objects.filter(start_time__date=today).count()
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return NarrationLog.objects.filter(start_time__gte=today_start).count()
 
 
 def get_hot_pois(top_n: int = 5):
@@ -56,7 +57,6 @@ class NarrationLogAdmin(admin.ModelAdmin):
     search_fields = ['user__email', 'user__username', 'poi__name']
     ordering = ['-start_time']
     readonly_fields = ['user', 'poi', 'trigger_type', 'start_time']
-    date_hierarchy = 'start_time'
     list_select_related = ['user', 'poi']
     list_per_page = 40
 
@@ -113,7 +113,6 @@ class BreadcrumbLogAdmin(admin.ModelAdmin):
     search_fields = ['user__email', 'user__username']
     ordering = ['-timestamp']
     readonly_fields = ['user', 'lat', 'long', 'timestamp']
-    date_hierarchy = 'timestamp'
     list_per_page = 50
 
     def user_label(self, obj):

@@ -9,4 +9,7 @@ urlpatterns = [
     path('invoices/<uuid:pk>/', views.InvoiceDetailView.as_view(), name='invoice-detail'),
     path('paypal/create-order/', views.paypal_create_order, name='paypal-create-order'),
     path('paypal/capture-order/<str:order_id>/', views.paypal_capture_order, name='paypal-capture-order'),
+    # Premium Tour
+    path('tour-purchase/', views.tour_purchase_create, name='tour-purchase-create'),
+    path('tour-purchase/check/', views.tour_purchase_check, name='tour-purchase-check'),
 ]

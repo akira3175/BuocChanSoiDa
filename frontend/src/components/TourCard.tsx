@@ -21,6 +21,9 @@ export default function TourCard({ tour, isActive = false, onClick, onDetailClic
         if (onDetailClick) onDetailClick(e);
     };
 
+    const isPremium = tour.is_premium;
+    const isLocked = isPremium && !tour.is_unlocked;
+
     return (
         <div
             onClick={onClick}
@@ -43,6 +46,22 @@ export default function TourCard({ tour, isActive = false, onClick, onDetailClic
                     <span className="material-symbols-outlined text-slate-300 text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>route</span>
                 )}
                 
+                {/* Premium Badge */}
+                {isPremium && (
+                    <div className={`absolute bottom-2 left-2 px-2.5 py-1 rounded-lg flex items-center gap-1 z-10 ${
+                        isLocked
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-amber-500/30'
+                            : 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/30'
+                    }`}>
+                        <span className="material-symbols-outlined text-white text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                            {isLocked ? 'lock' : 'verified'}
+                        </span>
+                        <span className="text-[10px] text-white font-bold uppercase tracking-wider">
+                            {isLocked ? 'Premium' : t('tour.unlocked', { defaultValue: 'Đã mở' })}
+                        </span>
+                    </div>
+                )}
+
                 {/* Detail Button Overlay */}
                 <button 
                     onClick={handleDetailClick}
@@ -57,9 +76,16 @@ export default function TourCard({ tour, isActive = false, onClick, onDetailClic
                         {tour.translated_name?.[i18n.language] || tour.name}
                     </p>
                 </div>
-                <p className="text-slate-500 text-xs font-medium mt-1">
-                    {duration ? `${duration} ${t('common.minutes')}` : '—'} • {poiCount} {t('common.locations')}
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                    <p className="text-slate-500 text-xs font-medium">
+                        {duration ? `${duration} ${t('common.minutes')}` : '—'} • {poiCount} {t('common.locations')}
+                    </p>
+                    {isPremium && isLocked && tour.premium_price ? (
+                        <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                            {tour.premium_price.toLocaleString('vi-VN')}₫
+                        </span>
+                    ) : null}
+                </div>
             </div>
         </div>
     );

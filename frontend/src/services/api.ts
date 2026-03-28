@@ -404,6 +404,31 @@ export const paypalCaptureOrder = async (orderId: string, invoiceId?: string): P
     return data;
 };
 
+// --- Premium Tour Purchase ---
+
+export interface TourPurchaseResponse {
+    invoice_id: string;
+    tour_purchase_id: string;
+    amount: number;
+    tour_name: string;
+}
+
+export const purchasePremiumTour = async (tourId: string | number): Promise<TourPurchaseResponse> => {
+    const { data } = await apiClient.post<TourPurchaseResponse>(
+        '/payments/tour-purchase/',
+        { tour_id: tourId }
+    );
+    return data;
+};
+
+export const checkTourPurchase = async (tourId: string | number): Promise<{ purchased: boolean }> => {
+    const { data } = await apiClient.get<{ purchased: boolean }>(
+        '/payments/tour-purchase/check/',
+        { params: { tour_id: tourId } }
+    );
+    return data;
+};
+
 // --- POI endpoints ---
 export const getPOIsNearMe = async (lat: number, lng: number, language = 'vi', voiceRegion = 'mien_nam', radius = 500): Promise<POI[]> => {
     const { data } = await apiClient.get<POI[]>('/pois/near-me/', { params: { lat, lng, radius, language, voice_region: voiceRegion } });

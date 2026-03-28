@@ -14,12 +14,28 @@ class TourPOIInline(admin.TabularInline):
 class TourAdmin(admin.ModelAdmin):
     list_display = [
         'id', 'tour_name', 'poi_count', 'estimated_duration_min',
-        'created_by', 'is_suggested', 'status_badge',
+        'created_by', 'is_suggested', 'premium_badge', 'premium_price_display',
+        'status_badge',
     ]
-    list_filter = ('status', 'is_suggested')
+    list_filter = ('status', 'is_suggested', 'is_premium')
     search_fields = ('tour_name', 'description', 'created_by__username')
     inlines = [TourPOIInline]
     list_per_page = 25
+
+    fieldsets = (
+        (None, {
+            'fields': (
+                'tour_name', 'description',
+                'translated_name', 'translated_description',
+                'estimated_duration_min', 'created_by',
+                'is_suggested', 'status',
+            ),
+        }),
+        ('💎 Premium Tour', {
+            'fields': ('is_premium', 'premium_price'),
+            'description': 'Đánh dấu tour Premium và thiết lập giá mở khóa.',
+        }),
+    )
 
     def status_badge(self, obj):
         color = '#28a745' if obj.status == 1 else '#dc3545'
@@ -34,6 +50,28 @@ class TourAdmin(admin.ModelAdmin):
         count = obj.tour_pois.count()
         return format_html('<span style="font-weight:600">📍 {}</span>', count)
     poi_count.short_description = 'Số POI'
+
+    def premium_badge(self, obj):
+        if obj.is_premium:
+            return format_html(
+                '<span style="background:#fbbf24;color:#78350f;padding:2px 8px;'
+                'border-radius:12px;font-weight:700;font-size:11px">⭐ Premium</span>'
+            )
+        return format_html(
+            '<span style="color:#94a3b8;font-size:11px">Miễn phí</span>'
+        )
+    premium_badge.short_description = 'Loại tour'
+    premium_badge.admin_order_field = 'is_premium'
+
+    def premium_price_display(self, obj):
+        if obj.is_premium and obj.premium_price:
+            price_str = f"{obj.premium_price:,}".replace(',', '.')
+            return format_html(
+                '<span style="font-weight:700;color:#b45309">{}₫</span>',
+                price_str,
+            )
+        return '—'
+    premium_price_display.short_description = 'Giá Premium'
 
 
 @admin.register(Tour_POI)
