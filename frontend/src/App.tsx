@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { AppProvider } from './context/AppContext';
 import PageTransition from './components/PageTransition';
+import AppSessionBootstrap from './components/AppSessionBootstrap';
 import RequirePartnerAuth from './components/RequirePartnerAuth';
 import SplashScreen from './pages/SplashScreen';
 import './index.css';
@@ -42,6 +43,7 @@ export default function App() {
     <AppProvider>
       <PayPalScriptProvider options={{ 'clientId': paypalClientId, currency: paypalCurrency }}>
         <BrowserRouter>
+          <AppSessionBootstrap />
           <div className="min-h-dvh bg-background-light">
             <Suspense fallback={<LazyFallback />}>
               <PageTransition>

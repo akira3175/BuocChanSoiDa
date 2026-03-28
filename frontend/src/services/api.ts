@@ -101,6 +101,16 @@ export const isUserAuthenticated = (): boolean => {
     return Boolean(session?.access);
 };
 
+/** Stable anonymous device id for guest login (localStorage). */
+export const getOrCreateDeviceId = (): string => {
+    let devId = localStorage.getItem('bcsd_device_id');
+    if (!devId) {
+        devId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('bcsd_device_id', devId);
+    }
+    return devId;
+};
+
 let partnerRefreshPromise: Promise<string> | null = null;
 let userRefreshPromise: Promise<string> | null = null;
 

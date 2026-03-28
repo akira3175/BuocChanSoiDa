@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import type { User, POI, NarrationState, Partner, Media } from '../types';
-import { getUserAuthSession, guestLogin } from '../services/api';
+import { getUserAuthSession } from '../services/api';
 
 interface AppState {
     user: User | null;
@@ -59,16 +59,6 @@ interface AppContextValue extends AppState {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-// Helper to generate or get device ID
-const getOrCreateDeviceId = () => {
-    let devId = localStorage.getItem('bcsd_device_id');
-    if (!devId) {
-        devId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
-        localStorage.setItem('bcsd_device_id', devId);
-    }
-    return devId;
-};
-
 // Helper to get initial user from session if available
 const getInitialUser = (): User | null => {
     const session = getUserAuthSession();
@@ -87,23 +77,6 @@ const initialState: AppState = {
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
     const [state, dispatch] = useReducer(reducer, initialState);
-
-    // Auto Guest Login
-    useEffect(() => {
-        const checkAutoLogin = async () => {
-            const session = getUserAuthSession();
-            if (!session) {
-                try {
-                    const devId = getOrCreateDeviceId();
-                    const newSession = await guestLogin(devId);
-                    dispatch({ type: 'SET_USER', payload: newSession.user });
-                } catch (error) {
-                    console.error("Auto guest login failed", error);
-                }
-            }
-        };
-        checkAutoLogin();
-    }, []);
 
     // Listen for online/offline events
     useEffect(() => {

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react';
 import AppLayout from '../components/AppLayout';
 import { getApiErrorMessage, getPartnerAccountProfile, isPartnerAuthenticated, logoutPartner, upsertPartnerAccountProfile } from '../services/api';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
@@ -339,11 +338,11 @@ export default function PartnerPortal() {
               />
             </div>
           </div>
-          <p className="mt-1 text-[11px] text-slate-500">
+          {/* <p className="mt-1 text-[11px] text-slate-500">
             {draft.openingHours ? `Định dạng lưu: ${draft.openingHours}` : 'Chọn đủ giờ mở và giờ đóng để lưu.'}
-          </p>
+          </p> */}
         </div>
-        <div>
+        {/* <div>
           <label className="text-xs font-semibold text-slate-600">POI ID (tự động cập nhật)</label>
           <input
             value={partnerPoiId || 'Chưa liên kết POI'}
@@ -364,7 +363,7 @@ export default function PartnerPortal() {
               <QRCodeSVG value={effectiveQrUrl} size={110} bgColor="#ffffff" fgColor="#0f172a" level="M" />
             </div>
           )}
-        </div>
+        </div> */}
 
         <div className="mt-2 rounded-xl border border-slate-100 p-3">
           <div className="flex items-center justify-between">

@@ -66,10 +66,9 @@ export default function Settings() {
     };
 
     const handleUserLogout = () => {
-        localStorage.removeItem('bcsd_user_auth');
+        setUserAuthSession(null);
         dispatch({ type: 'CLEAR_USER' });
-        // Redirecting to root / now automatically takes the user to /map with a new guest session
-        navigate('/', { replace: true });
+        navigate('/login', { replace: true });
     };
 
     const handleOpenInvoice = () => {

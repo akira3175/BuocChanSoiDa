@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import apiClient, { getApiErrorMessage } from '../services/api';
 import type { POI, POICategory } from '../types';
 
@@ -46,6 +47,7 @@ export default function PartnerPOI() {
     longitude: 106.7038,
     geofence_radius: 80,
   });
+  const { isPlaying, speakTTS, pause } = useAudioPlayer();
 
 
 
@@ -152,6 +154,14 @@ export default function PartnerPOI() {
     return <section className="mx-4 mt-4 rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-500 shadow-sm">Đang tải POI...</section>;
   }
 
+  const handleTestPoiDescription = () => {
+    if (isPlaying) {
+      pause();
+    } else if (formData.description.trim()) {
+      speakTTS(formData.description.trim(), 'vi-VN');
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError('');
@@ -206,8 +216,18 @@ export default function PartnerPOI() {
               rows={3}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary"
             />
+            <div className="mt-3 grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                onClick={handleTestPoiDescription}
+                className="flex items-center justify-center gap-1 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white"
+              >
+                <span className="material-symbols-outlined text-sm">{isPlaying ? 'stop_circle' : 'play_circle'}</span>
+                {isPlaying ? 'Dừng nghe' : 'Nghe thử intro'}
+              </button>
+            </div>
           </div>
-
+          
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-slate-600">Danh mục</label>
