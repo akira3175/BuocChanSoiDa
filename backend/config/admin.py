@@ -16,16 +16,19 @@ class BCSDAdminSite(AdminSite):
     def _get_stats(self):
         try:
             from analytics.models import NarrationLog
-            cutoff_15 = timezone.now() - timedelta(minutes=15)
-            cutoff_1h  = timezone.now() - timedelta(hours=1)
-            today      = timezone.now().date()
+            now        = timezone.now()
+            cutoff_15  = now - timedelta(minutes=15)
+            cutoff_1h  = now - timedelta(hours=1)
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-            active_users = (
+            auth_users = (
                 NarrationLog.objects
                 .filter(start_time__gte=cutoff_15, user__isnull=False)
                 .values('user').distinct().count()
             )
-            today_plays = NarrationLog.objects.filter(start_time__date=today).count()
+            guest_logs = NarrationLog.objects.filter(start_time__gte=cutoff_15, user__isnull=True).count()
+            active_users = auth_users + guest_logs
+            today_plays = NarrationLog.objects.filter(start_time__gte=today_start).count()
             hot_pois = (
                 NarrationLog.objects
                 .filter(start_time__gte=cutoff_1h)

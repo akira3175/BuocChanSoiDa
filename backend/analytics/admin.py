@@ -12,13 +12,15 @@ from .models import BreadcrumbLog, NarrationLog
 def get_active_users_count(minutes: int = 15) -> int:
     """Số users (non-null) có NarrationLog trong `minutes` phút gần nhất."""
     cutoff = timezone.now() - timedelta(minutes=minutes)
-    return (
+    auth_users = (
         NarrationLog.objects
         .filter(start_time__gte=cutoff, user__isnull=False)
         .values('user')
         .distinct()
         .count()
     )
+    guest_logs = NarrationLog.objects.filter(start_time__gte=cutoff, user__isnull=True).count()
+    return auth_users + guest_logs
 
 
 def get_today_narration_count() -> int:
