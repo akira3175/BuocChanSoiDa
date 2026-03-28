@@ -73,6 +73,9 @@ class TourPOIDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
 
+from pois.serializers import POIDetailSerializer
+
+
 class TourPOIGroupedView(APIView):
     """
     GET /api/tours/tour-pois/
@@ -82,7 +85,7 @@ class TourPOIGroupedView(APIView):
     - tour_ids=1,2,3  (tùy chọn) lọc theo danh sách tour id.
     """
 
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         raw_tour_ids = request.query_params.get('tour_ids', '').strip()
@@ -129,7 +132,7 @@ class TourPOIGroupedView(APIView):
         for mapping in mappings:
             grouped[mapping.tour_id]['items'].append({
                 'sequence_order': mapping.sequence_order,
-                'poi': POIListSerializer(mapping.poi, context={'request': request}).data,
+                'poi': POIDetailSerializer(mapping.poi, context={'request': request}).data,
             })
 
         result = []

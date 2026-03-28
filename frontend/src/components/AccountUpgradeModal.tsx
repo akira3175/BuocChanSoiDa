@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { upgradeGuestAccount } from '../services/api';
+import { upgradeGuestAccount, getApiErrorMessage } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';
 
@@ -34,7 +34,7 @@ export default function AccountUpgradeModal({ onClose }: AccountUpgradeModalProp
                 onClose();
             }, 1500);
         } catch (err: any) {
-            setError(err.response?.data?.email?.[0] || t('settings.errorGeneral'));
+            setError(getApiErrorMessage(err, t('settings.errorGeneral')));
             setLoading(false);
         }
     };

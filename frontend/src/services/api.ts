@@ -411,14 +411,19 @@ export const scanQRCode = async (code: string): Promise<POI> => {
     return data;
 };
 
+export const selectBestMedia = (mediaList: Media[], language: string, voiceRegion: string): Media | null => {
+    if (!Array.isArray(mediaList)) return null;
+    // Media Selection Engine: exact match > language-only match > null (TTS fallback)
+    const exactMatch = mediaList.find(m => m.language === language && m.voice_region === voiceRegion);
+    if (exactMatch) return exactMatch;
+    const languageMatch = mediaList.find(m => m.language === language);
+    return languageMatch || null;
+};
+
 export const getPOIMedia = async (poiId: string, language: string, voiceRegion: string): Promise<Media | null> => {
     try {
         const { data } = await apiClient.get<Media[]>(`/pois/${poiId}/media`, { params: { language, voice_region: voiceRegion } });
-        // Media Selection Engine: exact match > language-only match > null (TTS fallback)
-        const exactMatch = data.find(m => m.language === language && m.voice_region === voiceRegion);
-        if (exactMatch) return exactMatch;
-        const languageMatch = data.find(m => m.language === language);
-        return languageMatch || null;
+        return selectBestMedia(data, language, voiceRegion);
     } catch {
         return null;
     }

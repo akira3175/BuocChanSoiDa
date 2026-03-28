@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import type { POI, Media, Partner, Language, VoiceRegion } from '../types';
-import { startNarration, endNarration, getPOIMedia, getPOIPartners } from '../services/api';
+import { startNarration, endNarration, getPOIMedia, getPOIPartners, selectBestMedia } from '../services/api';
 
 const ANTI_SPAM_MINUTES = 2; // Giảm xuống 2 phút để user dễ test và phù hợp thực tế quay lại địa điểm
 const LOG_PREFIX = '[NarrationEngine]';
@@ -105,13 +105,19 @@ export function useNarrationEngine({
             localStorage.setItem(`bcsd_last_heard_${poi.id}`, Date.now().toString());
 
             // 5. Fetch Media & Partners
-            const [media, partners] = await Promise.all([
+            let [media, partners] = await Promise.all([
                 getPOIMedia(poi.id, language, voiceRegion),
                 getPOIPartners(poi.id).catch(() => [] as Partner[]),
             ]);
 
+            // Offline handle: Nếu không fetch được media từ API nhưng trong POI object đã có sẵn media array (từ offline package)
+            if (!media && Array.isArray(poi.media)) {
+                console.log(LOG_PREFIX, 'API media missing, selecting from local poi.media (offline mode)');
+                media = selectBestMedia(poi.media, language, voiceRegion);
+            }
+
             // 6. Notify UI
-            console.log(LOG_PREFIX, 'Narration ready for:', poi.name, 'Media:', media ? media.language : 'TTS (No file)');
+            console.log(LOG_PREFIX, 'Narration ready for:', poi.name, 'Media:', media ? `${media.language} (${media.media_type})` : 'TTS Fallback');
             onNarrationReady(poi, media, partners);
         },
         [language, voiceRegion, onNarrationReady, onNarrationConflict]

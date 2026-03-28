@@ -63,6 +63,13 @@ const createApiOfflineBlob = async (tourId: string): Promise<Blob> => {
     if (tour.cover_image_url) mediaUrls.add(tour.cover_image_url);
     pois.forEach(poi => {
         if (poi.image_url) mediaUrls.add(poi.image_url);
+        
+        // Thêm tất cả tệp âm thanh/TTS đa ngôn ngữ
+        if (Array.isArray(poi.media)) {
+            poi.media.forEach(m => {
+                if (m.file_url) mediaUrls.add(m.file_url);
+            });
+        }
     });
 
     const payload = {

@@ -361,11 +361,11 @@ export default function GuidedTour() {
                 </div>
             )}
 
-            {/* Tour Carousel */}
+            {/* Tour Grid/Carousel */}
             <div className="py-4">
                 <h3 className="text-slate-900 text-base font-bold px-4 pb-3">{t('tour.exploreTours')}</h3>
-                <div className="flex overflow-x-auto no-scrollbar pb-2">
-                    <div className="flex items-stretch px-4 gap-3">
+                <div className="px-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {tours.map((tour, i) => (
                             <div key={tour.id} className="animate-stagger-item" style={staggerStyle(i)}>
                                 <TourCard

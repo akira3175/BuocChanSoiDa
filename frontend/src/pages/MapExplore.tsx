@@ -347,7 +347,7 @@ export default function MapExplore() {
             </div>
 
             {/* TOP HEADER */}
-            <div className="relative z-20 flex flex-col gap-3 p-4 pt-safe">
+            <div className="relative z-20 flex flex-col gap-3 p-4 pt-safe mx-auto w-full max-w-2xl lg:max-w-4xl">
                 {/* Status bar */}
                 <div className="flex items-center justify-between rounded-xl bg-white/90 p-3 shadow-lg backdrop-blur-md">
                     <div className="flex items-center gap-3">
@@ -419,7 +419,7 @@ export default function MapExplore() {
             </div>
 
             {/* FAB STACK */}
-            <div className="relative z-20 mt-auto flex flex-col items-end gap-3 px-4 pb-2">
+            <div className="relative z-20 mt-auto flex flex-col items-end gap-3 px-4 pb-2 mx-auto w-full max-w-2xl lg:max-w-4xl">
                 {/* Filter */}
                 <button className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-slate-700 shadow-lg">
                     <span className="material-symbols-outlined">tune</span>
@@ -441,7 +441,7 @@ export default function MapExplore() {
             </div>
 
             {/* BOTTOM NAV */}
-            <div className="relative z-20">
+            <div className="relative z-20 w-full fixed bottom-0 left-0 right-0">
                 <BottomNavBar />
             </div>
 

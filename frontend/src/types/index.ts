@@ -41,6 +41,7 @@ export interface POI {
     address?: string;
     translated_name?: string;
     translated_description?: string;
+    media?: Media[];
 }
 
 export interface Media {

@@ -22,7 +22,7 @@ export default function BottomNavBar() {
 
     return (
         <nav className="border-t border-slate-200/60 bg-white/95 backdrop-blur-xl safe-bottom">
-            <div className="flex items-center justify-between px-4 pt-2 pb-3">
+            <div className="mx-auto w-full max-w-2xl lg:max-w-4xl flex items-center justify-between px-4 pt-2 pb-3">
                 {NAV_ITEMS.map((item) => {
                     const isActive = location.pathname === item.path;
                     return (
