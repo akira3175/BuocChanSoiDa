@@ -58,7 +58,18 @@
         "defaultDescription": "ヴィンカン通りの特別なグルメスポット。",
         "notFound": "ツアーが見つかりません",
         "backToRoutes": "ルートに戻る",
-        "relatedPOIs": "関連スポット"
+        "relatedPOIs": "関連スポット",
+        "premiumFeatures": "プレミアム機能",
+        "premiumAudio": "プロによる音声解説",
+        "premiumGuide": "専門ガイド",
+        "premiumUnlimited": "無制限アクセス",
+        "premiumPrice": "ロック解除料金",
+        "unlockNow": "今すぐロック解除",
+        "payWithPaypal": "PayPal で支払う",
+        "paypalError": "PayPal を初期化できませんでした。もう一度お試しください。",
+        "purchaseSuccess": "ロック解除成功！",
+        "purchaseSuccessDesc": "これでプレミアムツアーを開始できます。",
+        "authRequired": "ロックを解除するにはアカウントをリンクしてください。"
     },
     "offline": {
         "title": "オフラインデータをダウンロード",

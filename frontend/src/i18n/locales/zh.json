@@ -55,7 +55,18 @@
         "beFirstReview": "成为第一个评价此路线的人！",
         "categoryFood": "🍜 美食",
         "categoryHistorical": "🏛️ 古迹",
-        "defaultDescription": "永庆街上的特色美食站点。"
+        "defaultDescription": "永庆街上的特色美食站点。",
+        "premiumFeatures": "高级功能",
+        "premiumAudio": "专业语音讲解",
+        "premiumGuide": "专家导游",
+        "premiumUnlimited": "无限制访问",
+        "premiumPrice": "解锁费用",
+        "unlockNow": "立即解锁",
+        "payWithPaypal": "使用 PayPal 支付",
+        "paypalError": "无法初始化 PayPal，请重试。",
+        "purchaseSuccess": "解锁成功！",
+        "purchaseSuccessDesc": "您现在可以开始您的高级游览了。",
+        "authRequired": "请关联账户以解锁。"
     },
     "offline": {
         "title": "下载离线数据",

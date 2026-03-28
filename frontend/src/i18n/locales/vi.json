@@ -62,7 +62,18 @@
     "beFirstReview": "Hãy là người đầu tiên đánh giá tour này!",
     "categoryFood": "🍜 Ẩm thực",
     "categoryHistorical": "🏛️ Di tích",
-    "defaultDescription": "Điểm ẩm thực đặc sắc trên phố Vĩnh Khánh."
+    "defaultDescription": "Điểm ẩm thực đặc sắc trên phố Vĩnh Khánh.",
+    "premiumFeatures": "Tính năng Premium",
+    "premiumAudio": "Audio thuyết minh chuyên nghiệp",
+    "premiumGuide": "Hướng dẫn viên chuyên gia",
+    "premiumUnlimited": "Truy cập không giới hạn",
+    "premiumPrice": "Phí mở khóa",
+    "unlockNow": "Mở khóa ngay",
+    "payWithPaypal": "Thanh toán qua PayPal",
+    "paypalError": "Không thể khởi tạo PayPal. Vui lòng thử lại.",
+    "purchaseSuccess": "Mở khóa thành công!",
+    "purchaseSuccessDesc": "Bạn có thể bắt đầu tour premium ngay bây giờ.",
+    "authRequired": "Hãy liên kết tài khoản để mở khóa."
   },
   "offline": {
     "title": "Tải Dữ Liệu Offline",

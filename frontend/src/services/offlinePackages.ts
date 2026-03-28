@@ -16,6 +16,9 @@ export interface OfflinePackageData {
         name: string;
         sequence_order: number;
     }>;
+    is_premium?: boolean;
+    premium_price?: number;
+    is_unlocked?: boolean;
 }
 
 export class OfflineDataSourceError extends Error {
@@ -134,6 +137,9 @@ const mapToursToPackages = (tours: Tour[], groups: TourPOIGroup[]): OfflinePacka
             source: 'api' as const,
             source_detail: group ? 'tour-pois' : 'tours-fallback',
             related_pois: relatedPois,
+            is_premium: tour.is_premium,
+            premium_price: tour.premium_price,
+            is_unlocked: tour.is_unlocked,
         };
     });
 };

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import { PackageSkeleton, staggerStyle } from '../components/Skeleton';
 import { useSyncQueue } from '../hooks/useSyncQueue';
@@ -23,6 +24,9 @@ interface OfflinePackage {
     downloadStatus?: string;
     source?: string;
     source_detail?: string;
+    is_premium?: boolean;
+    premium_price?: number;
+    is_unlocked?: boolean;
 }
 
 
@@ -35,6 +39,7 @@ export default function OfflineDownload() {
     const { getPendingCount, flush } = useSyncQueue();
     const [pendingCount, setPendingCount] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
+    const navigate = useNavigate();
 
     // Load saved packages
     useEffect(() => {
@@ -281,6 +286,12 @@ export default function OfflineDownload() {
                                                 <h4 className="text-sm font-bold text-slate-900 truncate">
                                                     {pkg.translated_name?.[i18n.language] || pkg.name}
                                                 </h4>
+                                                {pkg.is_premium && !pkg.is_unlocked && (
+                                                    <div className="shrink-0 px-1.5 py-0.5 rounded flex items-center gap-1 bg-amber-100 text-amber-700">
+                                                        <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+                                                        <span className="text-[9px] font-bold uppercase tracking-wider">Premium</span>
+                                                    </div>
+                                                )}
                                             </div>
                                             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                                                 {pkg.translated_description?.[i18n.language] || pkg.description}
@@ -306,8 +317,16 @@ export default function OfflineDownload() {
                                                 <button onClick={() => handleDelete(pkg)} className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-500 text-xs font-bold hover:bg-red-50 hover:text-red-500 tap-scale transition-all">
                                                     {t('offline.delete')}
                                                 </button>
+                                            ) : pkg.is_premium && !pkg.is_unlocked ? (
+                                                <button 
+                                                    onClick={() => navigate(`/tours/${pkg.id}`)}
+                                                    className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold shadow-sm shadow-amber-500/20 tap-scale hover:shadow-md transition-all flex items-center gap-1"
+                                                >
+                                                    <span className="material-symbols-outlined text-[14px]">lock</span>
+                                                    Mở khóa ({pkg.premium_price?.toLocaleString('vi-VN')}₫)
+                                                </button>
                                             ) : (
-                                                <button onClick={() => handleDownload(pkg)} className="px-4 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-sm shadow-primary\/20 tap-scale hover:shadow-md transition-all">
+                                                <button onClick={() => handleDownload(pkg)} className="px-4 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-sm shadow-primary/20 tap-scale hover:shadow-md transition-all">
                                                     {t('offline.download')}
                                                 </button>
                                             )}

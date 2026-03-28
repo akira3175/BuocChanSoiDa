@@ -62,7 +62,18 @@
         "beFirstReview": "Be the first to review this tour!",
         "categoryFood": "🍜 Food",
         "categoryHistorical": "🏛️ Heritage",
-        "defaultDescription": "A unique food spot on Vĩnh Khánh street."
+        "defaultDescription": "A unique food spot on Vĩnh Khánh street.",
+        "premiumFeatures": "Premium Features",
+        "premiumAudio": "Professional Audio Narration",
+        "premiumGuide": "Expert Guides",
+        "premiumUnlimited": "Unlimited Access",
+        "premiumPrice": "Unlock Fee",
+        "unlockNow": "Unlock Now",
+        "payWithPaypal": "Pay with PayPal",
+        "paypalError": "Cannot initialize PayPal. Please try again.",
+        "purchaseSuccess": "Unlocked Successfully!",
+        "purchaseSuccessDesc": "You can now start your premium tour.",
+        "authRequired": "Please link an account to unlock."
     },
     "offline": {
         "title": "Download Offline Data",

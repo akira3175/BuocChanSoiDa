@@ -32,7 +32,11 @@ export default function PremiumTourCheckout({ tour, onClose, onSuccess }: Premiu
             setInvoiceId(result.invoice_id);
             setStep('pay');
         } catch (e) {
-            setError(getApiErrorMessage(e));
+            let msg = getApiErrorMessage(e);
+            if (msg.includes('Authentication credentials were not provided')) {
+                msg = t('tour.authRequired', { defaultValue: 'Hãy liên kết tài khoản để mở khóa.' });
+            }
+            setError(msg);
         } finally {
             setPaying(false);
         }
