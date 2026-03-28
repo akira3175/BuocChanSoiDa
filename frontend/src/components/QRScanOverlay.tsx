@@ -25,6 +25,53 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
         onScanSuccess(poi);
     }, [navigate, onScanSuccess]);
 
+    const extractPoiId = (text: string): string | null => {
+        // 1. URL pattern
+        try {
+            const url = new URL(text);
+            // Check params
+            const idFromParam = url.searchParams.get('poi') || 
+                                url.searchParams.get('id') || 
+                                url.searchParams.get('code');
+            if (idFromParam) return idFromParam;
+            
+            // Check path segments (e.g., /pois/8 or /poi/8)
+            const pathSegments = url.pathname.split('/').filter(Boolean);
+            for (let i = 0; i < pathSegments.length; i++) {
+                if ((pathSegments[i] === 'pois' || pathSegments[i] === 'poi') && pathSegments[i+1]) {
+                    if (/^\d+$/.test(pathSegments[i+1])) return pathSegments[i+1];
+                }
+            }
+            
+            // Check if the last segment is a number (e.g., /8/)
+            const lastSegment = pathSegments[pathSegments.length - 1];
+            if (lastSegment && /^\d+$/.test(lastSegment)) return lastSegment;
+            
+        } catch {
+            // Not a valid URL
+        }
+
+        // 2. JSON pattern
+        try {
+            const parsed = JSON.parse(text);
+            if (parsed && typeof parsed === 'object') {
+                if (parsed.id) return parsed.id.toString();
+                if (parsed.poiId) return parsed.poiId.toString();
+            }
+        } catch {
+            // Not JSON
+        }
+
+        // 3. Simple numeric string or "POI_8" pattern
+        const trimmed = text.trim();
+        if (/^\d+$/.test(trimmed)) return trimmed;
+        
+        const bcsdMatch = trimmed.match(/POI_(\d+)/i) || trimmed.match(/BCSD-POI-(\d+)/i);
+        if (bcsdMatch) return bcsdMatch[1];
+
+        return null;
+    };
+
     const handleQRResult = useCallback(async (decodedText: string) => {
         if (processedRef.current) return;
         processedRef.current = true;
@@ -36,30 +83,19 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
 
         try {
             let poi;
-            let poiId: string | null = null;
-
-            // Try to extract ID from URL (e.g. ?poi=8 or ?id=8)
-            try {
-                const url = new URL(decodedText);
-                poiId = url.searchParams.get('poi') || url.searchParams.get('id');
-            } catch {
-                // Try to extract from JSON (e.g. {"id": 8})
-                try {
-                    const parsed = JSON.parse(decodedText);
-                    if (parsed && parsed.id) poiId = parsed.id.toString();
-                } catch {
-                    // Fallback to raw text
-                }
-            }
+            const poiId = extractPoiId(decodedText);
 
             if (poiId) {
+                console.log(`[QR Scan] Extracted POI ID: ${poiId}`);
                 poi = await getPOIById(poiId);
             } else {
+                console.log(`[QR Scan] No ID extracted, calling scanQRCode for raw text: ${decodedText}`);
                 poi = await scanQRCode(decodedText);
             }
 
             await handlePOI(poi);
-        } catch {
+        } catch (err) {
+            console.error('[QR Scan] Failed processing:', err);
             const mockPoi: POI = {
                 id: 'demo-001',
                 name: 'Phố Ẩm Thực Vĩnh Khánh',

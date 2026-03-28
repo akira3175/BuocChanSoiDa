@@ -117,7 +117,6 @@ export default function MapExplore() {
 
     // Fetch POIs từ backend
     useEffect(() => {
-        console.log('[Map] Effect triggered. Position:', position, 'User ID:', user?.id);
         // Luôn fetch POIs tại Vĩnh Khánh nếu không có GPS, 
         // hoặc fetch theo GPS nếu có.
         const searchLat = position?.lat || DEFAULT_CENTER[0];
@@ -127,8 +126,6 @@ export default function MapExplore() {
         const lang = localStorage.getItem('bcsd_language') || user?.preferred_language || 'vi';
         const region = user?.preferred_voice_region || 'mien_nam';
 
-        console.log('[Map] Calling getPOIsNearMe...', { searchLat, searchLng, lang, region });
-
         getPOIsNearMe(
             searchLat,
             searchLng,
@@ -136,12 +133,10 @@ export default function MapExplore() {
             region
         )
             .then((data) => {
-                console.log('[Map] getPOIsNearMe success. Data count:', data.length);
                 if (data.length > 0) {
                     setPois(data);
                     dispatch({ type: 'SET_NEARBY_POIS', payload: data });
                 } else if (position) {
-                    console.log('[Map] No POIs here, fetching at default center...');
                     // Nếu ở vị trí hiện tại không có POI nào, hãy fetch lại ở Vĩnh Khánh để bản đồ không trống
                     getPOIsNearMe(DEFAULT_CENTER[0], DEFAULT_CENTER[1], lang, region)
                         .then(hcmData => {
