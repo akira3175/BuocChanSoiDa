@@ -1,17 +1,30 @@
 from rest_framework.permissions import BasePermission
 
 
+def user_has_partner_portal_access(user) -> bool:
+    """
+    Được phép dùng cổng Partner nếu:
+    - thuộc nhóm Django 'Partner', hoặc
+    - đã có bản ghi Partner (pois.Partner) gắn OneToOne với user.
+
+    Trường hợp admin tạo hồ sơ Partner và gắn user nhưng quên thêm group vẫn đăng nhập được.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if user.groups.filter(name='Partner').exists():
+        return True
+    from pois.models import Partner
+
+    return Partner.objects.filter(user=user).exists()
+
+
 class IsPartner(BasePermission):
     """
-    Chỉ cho phép user thuộc group 'Partner' truy cập.
+    Cho phép user có quyền cổng Partner (nhóm 'Partner' hoặc hồ sơ Partner đã gắn user).
     """
 
     def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and request.user.groups.filter(name='Partner').exists()
-        )
+        return user_has_partner_portal_access(request.user)
 
 
 class IsPartnerOwner(BasePermission):

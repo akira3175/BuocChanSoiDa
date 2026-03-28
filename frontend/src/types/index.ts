@@ -164,18 +164,36 @@ export interface PartnerAuthSession {
     refresh: string;
 }
 
+/** Đăng nhập Partner: email hoặc username + mật khẩu. */
 export interface PartnerLoginPayload {
+    identifier: string;
+    password: string;
+}
+
+/** Đăng nhập tài khoản người dùng app (theo email). */
+export interface UserLoginPayload {
     email: string;
     password: string;
 }
 
-export interface PartnerSignupPayload {
+/** Đăng ký tài khoản người dùng app (khách du lịch). */
+export interface UserSignupPayload {
     email: string;
     username: string;
     password: string;
     password_confirm: string;
     first_name?: string;
     last_name?: string;
+}
+
+/** Kích hoạt cổng Partner: xác thực tài khoản app + tạo/cập nhật hồ sơ Partner. */
+export interface PartnerSignupPayload {
+    /** Email hoặc username (trùng tài khoản app). */
+    identifier: string;
+    password: string;
+    password_confirm: string;
+    business_name: string;
+    address?: string;
 }
 
 export interface DeviceInfo {

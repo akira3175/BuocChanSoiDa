@@ -13,6 +13,8 @@ import type {
     PartnerAuthSession,
     PartnerLoginPayload,
     PartnerSignupPayload,
+    UserSignupPayload,
+    UserLoginPayload,
     PartnerAuthUser,
     UserAuthSession,
 } from '../types';
@@ -310,7 +312,7 @@ export const loginPartner = async (payload: PartnerLoginPayload): Promise<Partne
     return session;
 };
 
-export const loginUserAccount = async (payload: PartnerLoginPayload): Promise<UserAuthSession> => {
+export const loginUserAccount = async (payload: UserLoginPayload): Promise<UserAuthSession> => {
     const { data } = await apiClient.post<UserAuthSession>('/users/login/', payload);
     setUserAuthSession(data);
     return data;
@@ -327,7 +329,7 @@ export const signupPartner = async (payload: PartnerSignupPayload): Promise<Part
     return session;
 };
 
-export const signupUserAccount = async (payload: PartnerSignupPayload): Promise<UserAuthSession> => {
+export const signupUserAccount = async (payload: UserSignupPayload): Promise<UserAuthSession> => {
     const { data } = await apiClient.post<PartnerSignupResponse>('/users/register/', payload);
     return {
         user: {

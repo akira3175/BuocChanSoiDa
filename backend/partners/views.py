@@ -86,7 +86,8 @@ class PartnerDetailCRUDView(generics.RetrieveUpdateDestroyAPIView):
 class PartnerRegisterView(generics.CreateAPIView):
     """
     POST /api/partners/account/register/
-    Đăng ký tài khoản Partner actor. Trả về JWT tokens + thông tin user.
+    Xác thực tài khoản app (email, username, mật khẩu) + tạo/cập nhật hồ sơ Partner (business_name, ...).
+    Trả về JWT (cùng dạng với login) + thông tin user.
     """
 
     serializer_class = PartnerRegisterSerializer
@@ -99,20 +100,23 @@ class PartnerRegisterView(generics.CreateAPIView):
 
         refresh = RefreshToken.for_user(user)
 
-        return Response({
-            'message': 'Đăng ký tài khoản Partner thành công!',
-            'tokens': {
-                'refresh': str(refresh),
+        return Response(
+            {
+                'message': 'Đã kích hoạt cổng Partner cho tài khoản của bạn.',
                 'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'username': user.username,
+                    'full_name': user.get_full_name(),
+                    'preferred_language': user.preferred_language,
+                    'preferred_voice_region': user.preferred_voice_region,
+                    'roles': list(user.groups.values_list('name', flat=True)),
+                },
             },
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'username': user.username,
-                'full_name': user.get_full_name(),
-                'roles': list(user.groups.values_list('name', flat=True)),
-            }
-        }, status=status.HTTP_201_CREATED)
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class PartnerTokenObtainPairView(TokenObtainPairView):

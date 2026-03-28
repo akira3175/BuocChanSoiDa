@@ -8,12 +8,6 @@ const resolveNextPath = (nextParam: string | null): string => {
     return nextParam;
 };
 
-const guessUsernameFromEmail = (email: string): string => {
-    const normalized = email.trim().toLowerCase();
-    if (!normalized.includes('@')) return normalized;
-    return normalized.split('@')[0];
-};
-
 export default function PartnerSignup() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -23,10 +17,11 @@ export default function PartnerSignup() {
         return resolveNextPath(search.get('next'));
     }, [location.search]);
 
-    const [email, setEmail] = useState('');
-    const [username, setUsername] = useState('');
+    const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [businessName, setBusinessName] = useState('');
+    const [address, setAddress] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -47,10 +42,11 @@ export default function PartnerSignup() {
         setSubmitting(true);
         try {
             await signupPartner({
-                email: email.trim(),
-                username: username.trim(),
+                identifier: identifier.trim(),
                 password,
                 password_confirm: confirmPassword,
+                business_name: businessName.trim(),
+                address: address.trim(),
             });
             navigate(nextPath, { replace: true });
         } catch (error) {
@@ -67,76 +63,92 @@ export default function PartnerSignup() {
 
             <section className="relative w-full max-w-md rounded-3xl border border-white/15 bg-white/95 p-6 shadow-2xl backdrop-blur">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">Góc đối tác</p>
-                <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Tạo tài khoản Partner</h1>
-                <p className="mt-2 text-sm text-slate-600">Đăng ký bằng email và mật khẩu để truy cập trang quản lý dành cho đối tác.</p>
+                <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Đăng ký Partner</h1>
+                <p className="mt-2 text-sm text-slate-600">
+                    Bạn cần đã có <span className="font-semibold text-slate-800">tài khoản người dùng app</span>. Nhập{' '}
+                    <span className="font-semibold text-slate-800">email hoặc tên đăng nhập</span> và đúng mật khẩu app để xác thực, sau đó điền{' '}
+                    <span className="font-semibold text-slate-800">thông tin cơ sở</span> để tạo hồ sơ đối tác.
+                </p>
 
                 <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-                    <label className="block">
-                        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Email</span>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                setEmail(value);
-                                if (!username.trim()) setUsername(guessUsernameFromEmail(value));
-                            }}
-                            required
-                            autoComplete="email"
-                            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500"
-                            placeholder="partner@example.com"
-                        />
-                    </label>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Xác thực tài khoản app</p>
 
-                    <label className="block">
-                        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Tên tài khoản</span>
-                        <input
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            required
-                            autoComplete="username"
-                            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500"
-                            placeholder="partner_vinhkhanh"
-                        />
-                    </label>
+                        <label className="mt-3 block">
+                            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Email hoặc tên đăng nhập</span>
+                            <input
+                                type="text"
+                                value={identifier}
+                                onChange={(e) => setIdentifier(e.target.value)}
+                                required
+                                autoComplete="username"
+                                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500"
+                                placeholder="partner@example.com hoặc username"
+                            />
+                        </label>
 
-                    <label className="block">
-                        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Mật khẩu</span>
-                        <div className="mt-1 flex items-center rounded-2xl border border-slate-200 bg-slate-50 pr-2 focus-within:border-emerald-500">
+                        <label className="mt-3 block">
+                            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Mật khẩu</span>
+                            <div className="mt-1 flex items-center rounded-2xl border border-slate-200 bg-white pr-2 focus-within:border-emerald-500">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    autoComplete="current-password"
+                                    className="w-full rounded-2xl bg-transparent px-4 py-3 text-sm text-slate-800 outline-none"
+                                    placeholder="Mật khẩu tài khoản app"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((prev) => !prev)}
+                                    className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100"
+                                >
+                                    {showPassword ? 'Ẩn' : 'Hiện'}
+                                </button>
+                            </div>
+                        </label>
+
+                        <label className="mt-3 block">
+                            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Xác nhận mật khẩu</span>
                             <input
                                 type={showPassword ? 'text' : 'password'}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
                                 required
-                                minLength={8}
-                                autoComplete="new-password"
-                                className="w-full rounded-2xl bg-transparent px-4 py-3 text-sm text-slate-800 outline-none"
-                                placeholder="Tối thiểu 8 ký tự"
+                                autoComplete="current-password"
+                                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500"
+                                placeholder="Nhập lại mật khẩu"
                             />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword((prev) => !prev)}
-                                className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:bg-slate-200"
-                            >
-                                {showPassword ? 'Ẩn' : 'Hiện'}
-                            </button>
-                        </div>
-                    </label>
+                        </label>
+                    </div>
 
-                    <label className="block">
-                        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Xác nhận mật khẩu</span>
-                        <input
-                            type={showPassword ? 'text' : 'password'}
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            required
-                            minLength={8}
-                            autoComplete="new-password"
-                            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500"
-                            placeholder="Nhập lại mật khẩu"
-                        />
-                    </label>
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-800">Hồ sơ đối tác</p>
+
+                        <label className="mt-3 block">
+                            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Tên cơ sở / quán</span>
+                            <input
+                                type="text"
+                                value={businessName}
+                                onChange={(e) => setBusinessName(e.target.value)}
+                                required
+                                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500"
+                                placeholder="VD: Quán phở Vĩnh Khánh"
+                            />
+                        </label>
+
+                        <label className="mt-3 block">
+                            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Địa chỉ</span>
+                            <input
+                                type="text"
+                                value={address}
+                                onChange={(e) => setAddress(e.target.value)}
+                                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500"
+                                placeholder="Số nhà, đường, quận..."
+                            />
+                        </label>
+                    </div>
 
                     {errorMessage && (
                         <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600">
@@ -146,20 +158,26 @@ export default function PartnerSignup() {
 
                     <button
                         type="submit"
-                        disabled={submitting}
+                        disabled={submitting || !businessName.trim()}
                         className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                        {submitting ? 'Đang tạo tài khoản...' : 'Đăng ký'}
+                        {submitting ? 'Đang tạo hồ sơ...' : 'Tạo hồ sơ Partner'}
                     </button>
                 </form>
 
                 <p className="mt-5 text-center text-sm text-slate-600">
-                    Đã có tài khoản?{' '}
+                    Chưa có tài khoản app?{' '}
+                    <Link to="/login" className="font-bold text-emerald-700 hover:text-emerald-600">
+                        Đăng ký người dùng
+                    </Link>
+                </p>
+                <p className="mt-2 text-center text-sm text-slate-600">
+                    Đã có hồ sơ Partner?{' '}
                     <Link
                         to={`/partner/login?next=${encodeURIComponent(nextPath)}`}
                         className="font-bold text-emerald-700 hover:text-emerald-600"
                     >
-                        Đăng nhập
+                        Đăng nhập Partner
                     </Link>
                 </p>
 

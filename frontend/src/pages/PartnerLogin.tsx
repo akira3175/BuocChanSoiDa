@@ -17,7 +17,7 @@ export default function PartnerLogin() {
         return resolveNextPath(search.get('next'));
     }, [location.search]);
 
-    const [email, setEmail] = useState('');
+    const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -33,10 +33,10 @@ export default function PartnerLogin() {
         setSubmitting(true);
 
         try {
-            await loginPartner({ email: email.trim(), password });
+            await loginPartner({ identifier: identifier.trim(), password });
             navigate(nextPath, { replace: true });
         } catch (error) {
-            setErrorMessage(getApiErrorMessage(error, 'Đăng nhập thất bại. Vui lòng kiểm tra email và mật khẩu.'));
+            setErrorMessage(getApiErrorMessage(error, 'Đăng nhập thất bại. Vui lòng kiểm tra email/username và mật khẩu.'));
         } finally {
             setSubmitting(false);
         }
@@ -50,19 +50,26 @@ export default function PartnerLogin() {
             <section className="relative w-full max-w-md rounded-3xl border border-white/15 bg-white/95 p-6 shadow-2xl backdrop-blur">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-700">Góc đối tác</p>
                 <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Đăng nhập Partner</h1>
-                <p className="mt-2 text-sm text-slate-600">Đăng nhập bằng email và mật khẩu để vào trung tâm quản lý đối tác.</p>
+                <p className="mt-2 text-sm text-slate-600">
+                    Đăng nhập bằng <span className="font-semibold text-slate-800">email hoặc tên đăng nhập</span> (trùng tài khoản app) và mật khẩu.
+                </p>
 
-                <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+                <form
+                    method="post"
+                    action="#"
+                    className="mt-6 space-y-4"
+                    onSubmit={handleSubmit}
+                >
                     <label className="block">
-                        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Email</span>
+                        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Email hoặc tên đăng nhập</span>
                         <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
+                            type="text"
+                            value={identifier}
+                            onChange={(e) => setIdentifier(e.target.value)}
                             required
-                            autoComplete="email"
+                            autoComplete="username"
                             className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-cyan-500"
-                            placeholder="partner@example.com"
+                            placeholder="partner@example.com hoặc username"
                         />
                     </label>
 
@@ -104,12 +111,12 @@ export default function PartnerLogin() {
                 </form>
 
                 <p className="mt-5 text-center text-sm text-slate-600">
-                    Chưa có tài khoản?{' '}
+                    Lần đầu vào cổng Partner?{' '}
                     <Link
                         to={`/partner/signup?next=${encodeURIComponent(nextPath)}`}
                         className="font-bold text-cyan-700 hover:text-cyan-600"
                     >
-                        Đăng ký ngay
+                        Kích hoạt bằng tài khoản app
                     </Link>
                 </p>
 

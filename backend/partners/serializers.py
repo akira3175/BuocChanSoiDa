@@ -4,6 +4,8 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from users.permissions import user_has_partner_portal_access
+
 from .models import Partner
 
 User = get_user_model()
@@ -70,66 +72,164 @@ class PartnerCRUDSerializer(serializers.ModelSerializer):
         }
 
 
-class PartnerRegisterSerializer(serializers.ModelSerializer):
-    """Serializer đăng ký tài khoản Partner actor."""
+class PartnerRegisterSerializer(serializers.Serializer):
+    """
+    Mở cổng Partner cho user đã có tài khoản ứng dụng: xác thực bằng email *hoặc* username + mật khẩu,
+    đồng thời tạo/cập nhật bản ghi Partner với thông tin cơ sở gửi lên. Không tạo User mới.
+    """
 
-    password = serializers.CharField(
-        write_only=True,
-        min_length=8,
-        validators=[validate_password],
-        style={'input_type': 'password'}
+    identifier = serializers.CharField(
+        max_length=254,
+        help_text='Email đăng nhập app hoặc tên đăng nhập (username).',
     )
-    password_confirm = serializers.CharField(
-        write_only=True,
-        style={'input_type': 'password'}
-    )
+    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+    password_confirm = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
-    class Meta:
-        model = User
-        fields = [
-            'email', 'username', 'password', 'password_confirm',
-            'first_name', 'last_name', 'phone_number',
-            'preferred_language', 'preferred_voice_region',
-        ]
-        extra_kwargs = {
-            'first_name': {'required': False},
-            'last_name': {'required': False},
-            'phone_number': {'required': False},
-            'preferred_language': {'required': False},
-            'preferred_voice_region': {'required': False},
-        }
+    business_name = serializers.CharField(max_length=255)
+    address = serializers.CharField(required=False, allow_blank=True, default='')
+    intro_text = serializers.CharField(required=False, allow_blank=True, default='')
+    opening_hours = serializers.CharField(required=False, allow_blank=True, default='')
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
             raise serializers.ValidationError(
                 {'password_confirm': 'Mật khẩu xác nhận không khớp.'}
             )
+
+        raw = (attrs.get('identifier') or '').strip()
+        if not raw:
+            raise serializers.ValidationError(
+                {'identifier': 'Vui lòng nhập email hoặc tên đăng nhập (username).'}
+            )
+
+        user = User.objects.filter(email__iexact=raw).first()
+        if not user:
+            user = User.objects.filter(username__iexact=raw).first()
+        if not user:
+            raise serializers.ValidationError(
+                {
+                    'identifier': (
+                        'Không tìm thấy tài khoản người dùng với email hoặc username này. '
+                        'Hãy đăng ký tài khoản ứng dụng trước, sau đó quay lại để kích hoạt cổng Partner.'
+                    )
+                }
+            )
+
+        if not user.check_password(attrs['password']):
+            raise serializers.ValidationError(
+                {
+                    'password': (
+                        'Mật khẩu không đúng với tài khoản người dùng. '
+                        'Hãy nhập đúng mật khẩu bạn dùng khi đăng nhập app.'
+                    )
+                }
+            )
+
+        if user_has_partner_portal_access(user):
+            raise serializers.ValidationError(
+                {
+                    'identifier': (
+                        'Tài khoản này đã có quyền Partner. '
+                        'Vui lòng đăng nhập cổng đối tác thay vì đăng ký lại.'
+                    )
+                }
+            )
+
+        bn = (attrs.get('business_name') or '').strip()
+        if not bn:
+            raise serializers.ValidationError(
+                {'business_name': 'Vui lòng nhập tên cơ sở / quán.'}
+            )
+
+        self._partner_link_user = user
         return attrs
 
     def create(self, validated_data):
-        validated_data.pop('password_confirm')
-        password = validated_data.pop('password')
-        user = User(**validated_data)
-        user.set_password(password)
-        user.save()
+        user = self._partner_link_user
 
-        # Gán quyền actor Partner cho tài khoản vừa đăng ký.
         partner_group, _ = Group.objects.get_or_create(name='Partner')
         user.groups.add(partner_group)
+
+        validated_data.pop('password', None)
+        validated_data.pop('password_confirm', None)
+        validated_data.pop('identifier', None)
+
+        business_name = (validated_data.pop('business_name') or '').strip()[:255]
+        address = (validated_data.pop('address', '') or '').strip()
+        intro_text = (validated_data.pop('intro_text', '') or '').strip()
+        opening_hours = (validated_data.pop('opening_hours', '') or '').strip()
+
+        Partner.objects.update_or_create(
+            user=user,
+            defaults={
+                'business_name': business_name,
+                'address': address,
+                'intro_text': intro_text,
+                'opening_hours': opening_hours,
+                'status': Partner.Status.PENDING_APPROVAL,
+            },
+        )
 
         return user
 
 
 class PartnerTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """JWT login serializer cho Partner actor."""
+    """JWT login serializer cho Partner actor — đăng nhập bằng email hoặc username (trường identifier)."""
+
+    identifier = serializers.CharField(required=False, allow_blank=True, write_only=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # TokenObtainSerializer luôn đặt USERNAME_FIELD (email) là bắt buộc; ta cho phép chỉ gửi identifier + password.
+        uf = User.USERNAME_FIELD
+        if uf in self.fields:
+            self.fields[uf].required = False
+            self.fields[uf].allow_blank = True
 
     def validate(self, attrs):
-        data = super().validate(attrs)
-        is_partner = self.user.groups.filter(name='Partner').exists()
-        if not is_partner:
+        identifier = (attrs.pop('identifier', None) or '').strip()
+        uf = User.USERNAME_FIELD
+        email_or_username = (attrs.get(uf) or '').strip()
+
+        if identifier and not email_or_username:
+            user = User.objects.filter(email__iexact=identifier).first()
+            if not user:
+                user = User.objects.filter(username__iexact=identifier).first()
+            if user:
+                attrs[uf] = user.email
+            else:
+                raise serializers.ValidationError(
+                    {
+                        'identifier': (
+                            'Không tìm thấy tài khoản với email hoặc username này.'
+                        )
+                    }
+                )
+        elif not (attrs.get(uf) or '').strip():
             raise serializers.ValidationError(
-                {'detail': 'Tài khoản không thuộc nhóm Partner.'}
+                {
+                    'identifier': (
+                        'Thiếu email/username: gửi JSON { "identifier": "email hoặc username", "password": "..." } '
+                        'hoặc { "email": "...", "password": "..." }.'
+                    )
+                }
             )
+
+        data = super().validate(attrs)
+        if not user_has_partner_portal_access(self.user):
+            raise serializers.ValidationError(
+                {
+                    'detail': (
+                        'Tài khoản chưa có quyền cổng Partner. '
+                        'Cần hồ sơ đối tác đã gắn với email này hoặc thuộc nhóm Partner.'
+                    )
+                }
+            )
+
+        # Đồng bộ nhóm Django cho tài khoản đã có Partner nhưng admin chưa thêm group.
+        if not self.user.groups.filter(name='Partner').exists():
+            partner_group, _ = Group.objects.get_or_create(name='Partner')
+            self.user.groups.add(partner_group)
 
         data['user'] = {
             'id': self.user.id,
