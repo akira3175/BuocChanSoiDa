@@ -40,7 +40,7 @@ export default function App() {
 
   return (
     <AppProvider>
-      <PayPalScriptProvider options={{ 'client-id': paypalClientId, currency: paypalCurrency }}>
+      <PayPalScriptProvider options={{ 'clientId': paypalClientId, currency: paypalCurrency }}>
         <BrowserRouter>
           <div className="min-h-dvh bg-background-light">
             <Suspense fallback={<LazyFallback />}>
