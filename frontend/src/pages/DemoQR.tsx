@@ -20,7 +20,7 @@ export default function DemoQRPage() {
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 try {
-                    const data = await getPOIsNearMe(pos.coords.latitude, pos.coords.longitude, 50000);
+                    const data = await getPOIsNearMe(pos.coords.latitude, pos.coords.longitude, "50000");
                     const withQR = data.filter((p: POI) => p.qr_code_data);
                     if (withQR.length > 0) {
                         setPois(withQR.map((p: POI) => ({

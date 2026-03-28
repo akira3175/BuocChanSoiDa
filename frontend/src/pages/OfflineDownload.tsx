@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import { PackageSkeleton, staggerStyle } from '../components/Skeleton';
 import { useSyncQueue } from '../hooks/useSyncQueue';
