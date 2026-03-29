@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -23,17 +23,11 @@ export default function Settings() {
     const { user, dispatch } = useApp();
     const deviceInfo = useDeviceInfo();
     const [language, setLanguage] = useState<Language>(user?.preferred_language || 'vi');
-    const [voiceRegion, setVoiceRegion] = useState<VoiceRegion>(user?.preferred_voice_region || 'mien_nam');
+    const [voiceRegion] = useState<VoiceRegion>(user?.preferred_voice_region || 'mien_nam');
     const [saved, setSaved] = useState(false);
     const [loading, setLoading] = useState(true);
     const [showDeviceInfo, setShowDeviceInfo] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-
-    const VOICE_REGIONS: { value: VoiceRegion; label: string; subtitle: string; icon: string }[] = [
-        { value: 'mien_nam', label: t('settings.voiceSouth'), subtitle: t('settings.voiceSouthDesc'), icon: '🌴' },
-        { value: 'mien_bac', label: t('settings.voiceNorth'), subtitle: t('settings.voiceNorthDesc'), icon: '🏔️' },
-        { value: 'mien_trung', label: t('settings.voiceCentral'), subtitle: t('settings.voiceCentralDesc'), icon: '🏖️' },
-    ];
 
     // Simulate load
     useState(() => {
@@ -75,6 +69,21 @@ export default function Settings() {
         navigate('/invoice');
     };
 
+    /** Tên hiển thị: đã đăng nhập thật → full_name / username / phần trước @; khách / chưa login → Khách du lịch */
+    const profileDisplayName = useMemo(() => {
+        if (!user) return t('settings.tourist');
+        const email = user.email?.trim() || '';
+        if (email.endsWith('@guest.bcsd.local')) return t('settings.tourist');
+        if (!email) return t('settings.tourist');
+        const fn = user.full_name?.trim();
+        if (fn) return fn;
+        const un = user.username?.trim();
+        if (un) return un;
+        return email.split('@')[0] || t('settings.tourist');
+    }, [user, t]);
+
+    const hasRegisteredEmail = Boolean(user?.email && !user.email.endsWith('@guest.bcsd.local'));
+
     if (loading) {
         return (
             <AppLayout title={t('settings.title')}>
@@ -91,8 +100,8 @@ export default function Settings() {
                     <div className="size-14 rounded-full bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center shadow-lg shadow-primary\/20">
                         <span className="material-symbols-outlined text-white text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
                     </div>
-                    <div className="flex-1">
-                        <p className="font-bold text-slate-900">{user?.full_name || t('settings.tourist')}</p>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-900 truncate">{profileDisplayName}</p>
                         {user?.email?.endsWith('@guest.bcsd.local') ? (
                             <button
                                 onClick={() => setShowUpgradeModal(true)}
@@ -101,9 +110,9 @@ export default function Settings() {
                                 <span className="material-symbols-outlined text-[14px]">link</span>
                                 {t('settings.linkAccount')}
                             </button>
-                        ) : (
-                            <p className="text-xs text-slate-500 mt-0.5">{user?.email}</p>
-                        )}
+                        ) : hasRegisteredEmail ? (
+                            <p className="text-xs text-slate-500 mt-0.5 truncate">{user?.email}</p>
+                        ) : null}
                     </div>
                 </div>
             </div>
@@ -134,6 +143,7 @@ export default function Settings() {
             </div>
 
             {/* Voice Region Section */}
+            {/*
             <div className="mx-4 mt-5 animate-stagger-item" style={staggerStyle(1)}>
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">{t('settings.voiceRegion')}</h3>
                 <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100">
@@ -160,6 +170,7 @@ export default function Settings() {
                     ))}
                 </div>
             </div>
+            */}
 
             {/* App Info */}
             <div className="mx-4 mt-5 animate-stagger-item" style={staggerStyle(2)}>

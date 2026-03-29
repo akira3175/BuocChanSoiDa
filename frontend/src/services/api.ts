@@ -85,7 +85,17 @@ export const getUserAuthSession = (): UserAuthSession | null => {
     try {
         const raw = localStorage.getItem(USER_AUTH_STORAGE_KEY);
         if (!raw) return null;
-        return JSON.parse(raw) as UserAuthSession;
+        const parsed = JSON.parse(raw) as unknown;
+        if (
+            !parsed ||
+            typeof parsed !== 'object' ||
+            !('access' in parsed) ||
+            !('refresh' in parsed) ||
+            !('user' in parsed)
+        ) {
+            return null;
+        }
+        return parsed as UserAuthSession;
     } catch {
         return null;
     }
@@ -330,18 +340,33 @@ export const signupPartner = async (payload: PartnerSignupPayload): Promise<Part
     return session;
 };
 
+/** POST /api/users/register/ — trả `tokens: { access, refresh }`, không phải access ở root. */
 export const signupUserAccount = async (payload: UserSignupPayload): Promise<UserAuthSession> => {
-    const { data } = await apiClient.post<PartnerSignupResponse>('/users/register/', payload);
-    return {
+    const { data } = await apiClient.post<{
+        message: string;
+        tokens: { access: string; refresh: string };
         user: {
-            ...data.user,
-            device_id: (data.user as any).device_id || '',
-            preferred_language: data.user.preferred_language || 'vi', // Fallback to 'vi'
-            preferred_voice_region: data.user.preferred_voice_region || 'mien_nam' // Fallback to 'mien_nam'
-        } as User,
-        access: data.access,
-        refresh: data.refresh,
+            id: number;
+            email: string;
+            username: string;
+            full_name?: string;
+        };
+    }>('/users/register/', payload);
+    const session: UserAuthSession = {
+        user: {
+            id: data.user.id,
+            email: data.user.email,
+            username: data.user.username,
+            full_name: data.user.full_name || '',
+            device_id: getOrCreateDeviceId(),
+            preferred_language: 'vi',
+            preferred_voice_region: 'mien_nam',
+        },
+        access: data.tokens.access,
+        refresh: data.tokens.refresh,
     };
+    setUserAuthSession(session);
+    return session;
 };
 
 export const logoutPartner = async (): Promise<void> => {

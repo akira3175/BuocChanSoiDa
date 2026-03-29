@@ -2,17 +2,26 @@ import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { getApiErrorMessage, loginUserAccount, signupUserAccount } from '../services/api';
+import { getApiErrorMessage, loginUserAccount, signupUserAccount, getOrCreateDeviceId } from '../services/api';
+import type { User } from '../types';
 
 type AuthMode = 'login' | 'signup';
-
-const USER_AUTH_STORAGE_KEY = 'bcsd_user_auth';
 
 const guessUsernameFromEmail = (email: string): string => {
     const normalized = email.trim().toLowerCase();
     if (!normalized.includes('@')) return normalized;
     return normalized.split('@')[0];
 };
+
+function userForAppState(sessionUser: User): User {
+    const deviceId = getOrCreateDeviceId();
+    return {
+        ...sessionUser,
+        device_id: sessionUser.device_id || deviceId,
+        preferred_language: sessionUser.preferred_language || 'vi',
+        preferred_voice_region: sessionUser.preferred_voice_region || 'mien_nam',
+    };
+}
 
 export default function UserAuth() {
     const navigate = useNavigate();
@@ -32,20 +41,6 @@ export default function UserAuth() {
         return mode === 'login' ? 'Đăng nhập tài khoản người dùng' : 'Đăng ký tài khoản người dùng';
     }, [mode]);
 
-    const saveUserProfile = (emailValue: string) => {
-        const normalizedEmail = emailValue.trim().toLowerCase();
-        dispatch({
-            type: 'SET_USER',
-            payload: {
-                id: normalizedEmail || `guest-${Date.now()}`,
-                device_id: normalizedEmail || `guest-${Date.now()}`,
-                preferred_language: 'vi',
-                preferred_voice_region: 'mien_nam',
-            },
-        });
-        localStorage.setItem(USER_AUTH_STORAGE_KEY, 'true');
-    };
-
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setErrorMessage('');
@@ -58,22 +53,34 @@ export default function UserAuth() {
         setSubmitting(true);
         try {
             if (mode === 'login') {
-                await loginUserAccount({ email: email.trim(), password });
+                const session = await loginUserAccount({ email: email.trim(), password });
+                dispatch({ type: 'SET_USER', payload: userForAppState(session.user) });
             } else {
-                await signupUserAccount({
+                const session = await signupUserAccount({
                     email: email.trim(),
                     username: username.trim(),
                     password,
                     password_confirm: confirmPassword,
                 });
+                dispatch({ type: 'SET_USER', payload: userForAppState(session.user) });
             }
-            saveUserProfile(email);
             navigate('/map', { replace: true });
         } catch (error) {
-            // Demo mode: cho phép vào app ngay khi auth API chưa sẵn sàng.
+            // Demo mode: cho phép vào app ngay khi auth API chưa sẵn sàng (không ghi đè JWT trong localStorage).
             if (email.trim() && password.trim()) {
-                saveUserProfile(email);
                 setIsDemoMode(true);
+                const normalizedEmail = email.trim().toLowerCase();
+                dispatch({
+                    type: 'SET_USER',
+                    payload: {
+                        id: normalizedEmail,
+                        email: normalizedEmail,
+                        username: guessUsernameFromEmail(normalizedEmail),
+                        device_id: getOrCreateDeviceId(),
+                        preferred_language: 'vi',
+                        preferred_voice_region: 'mien_nam',
+                    },
+                });
                 navigate('/map', { replace: true });
                 return;
             }

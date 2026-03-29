@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { initUser } from '../services/api';
+import { initUser, getUserAuthSession } from '../services/api';
 import { useDeviceId } from '../hooks/useDeviceId';
 import { useApp } from '../context/AppContext';
 
@@ -58,19 +58,32 @@ export default function SplashScreen() {
                     
                     dispatch({ type: 'SET_USER', payload: mergedUser });
                 } catch {
-                    // Nếu backend chưa có, dùng user từ localStorage hoặc mặc định
+                    // Backend không có /users/init/ hoặc lỗi mạng — giữ JWT user nếu đã đăng nhập
                     const savedLang = localStorage.getItem('bcsd_language');
                     const savedRegion = localStorage.getItem('bcsd_voice_region');
-                    
-                    dispatch({
-                        type: 'SET_USER',
-                        payload: {
-                            id: deviceId,
-                            device_id: deviceId,
-                            preferred_language: (savedLang as any) || 'vi',
-                            preferred_voice_region: (savedRegion as any) || 'mien_nam',
-                        },
-                    });
+                    const session = getUserAuthSession();
+                    if (session?.user) {
+                        dispatch({
+                            type: 'SET_USER',
+                            payload: {
+                                ...session.user,
+                                device_id: session.user.device_id || deviceId,
+                                preferred_language: (savedLang as any) || session.user.preferred_language || 'vi',
+                                preferred_voice_region:
+                                    (savedRegion as any) || session.user.preferred_voice_region || 'mien_nam',
+                            },
+                        });
+                    } else {
+                        dispatch({
+                            type: 'SET_USER',
+                            payload: {
+                                id: deviceId,
+                                device_id: deviceId,
+                                preferred_language: (savedLang as any) || 'vi',
+                                preferred_voice_region: (savedRegion as any) || 'mien_nam',
+                            },
+                        });
+                    }
                 }
                 setPhase(2);
             }
