@@ -187,7 +187,7 @@ export default function Settings() {
                 </div>
             </div>
 
-            <div className="mx-4 mt-5 animate-stagger-item" style={staggerStyle(3)}>
+            <div className="mx-4 mt-5 animate-stagger-item" style={staggerStyle(3)}> 
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">{t('settings.deviceInfo')}</h3>
                 <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100">
                     <button
