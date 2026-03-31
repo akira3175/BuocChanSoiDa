@@ -170,6 +170,13 @@ CORS_ALLOWED_ORIGINS = [
     "https://buocchansoida.netlify.app",
 ]
 
+# Comma-separated, e.g. http://YOUR_EC2_IP:3000 (Docker frontend mapped port)
+_cors_extra = os.getenv("CORS_EXTRA_ORIGINS", "")
+if _cors_extra.strip():
+    CORS_ALLOWED_ORIGINS.extend(
+        [o.strip() for o in _cors_extra.split(",") if o.strip()]
+    )
+
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.ngrok-free\.app$",
     r"^https://.*\.ngrok-free\.dev$", 
@@ -183,6 +190,12 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.ngrok-free.app",
     "https://*.ngrok-free.dev",
 ]
+
+_csrf_extra = os.getenv("CSRF_TRUSTED_ORIGINS_EXTRA", "")
+if _csrf_extra.strip():
+    CSRF_TRUSTED_ORIGINS.extend(
+        [o.strip() for o in _csrf_extra.split(",") if o.strip()]
+    )
 
 
 # CORS configuration for allowed headers

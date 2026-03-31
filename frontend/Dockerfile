@@ -1,11 +1,16 @@
-FROM node:20.18.0-alpine3.20 as build
+FROM node:20.18.0-alpine3.20 AS build
 
 WORKDIR /app
 
-# If you need to configure backend URL, VITE_* must be provided at build time.
-# Example: --build-arg VITE_API_URL=http://1.2.3.4:8000/api
+# Vite inlines VITE_* at `npm run build` — runtime env on nginx does not change them.
+# Example:
+#   docker build --build-arg VITE_API_URL=http://YOUR_IP:8000/api -t frontend-image .
 ARG VITE_API_URL
+ARG VITE_PAYPAL_CLIENT_ID
+ARG VITE_PUBLIC_BASE_URL
 ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_PAYPAL_CLIENT_ID=${VITE_PAYPAL_CLIENT_ID}
+ENV VITE_PUBLIC_BASE_URL=${VITE_PUBLIC_BASE_URL}
 
 COPY package*.json ./
 RUN npm ci
