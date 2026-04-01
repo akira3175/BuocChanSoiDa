@@ -4,10 +4,12 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
 
 # mysqlclient build deps (Python package compiles native extension)
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends gcc pkg-config default-libmysqlclient-dev \
+RUN apt-get update -o Acquire::Retries=5 \
+  && apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
+    gcc pkg-config default-libmysqlclient-dev \
   && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app/requirements.txt

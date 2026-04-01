@@ -1,0 +1,17 @@
+# HTTPS via Let's Encrypt (needs a real DNS name pointing at this server; not only a raw IP).
+# Set DOMAIN and ACME_EMAIL in the project root .env when using docker compose.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+
+	handle /api* {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}
