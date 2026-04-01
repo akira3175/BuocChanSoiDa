@@ -55,4 +55,4 @@ nosetests.xml
 coverage.xml
 htmlcov/
 .pytest_cache/
-docker-compose.yml
+backend/docker-compose.yml
