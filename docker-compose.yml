@@ -4,10 +4,8 @@ services:
       context: ./backend
     env_file:
       - ./backend/.env
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend:/app
+    expose:
+      - "8000"
     restart: unless-stopped
 
   frontend:
@@ -15,12 +13,42 @@ services:
       context: ./frontend
       args:
         # Must be set at build time for Vite (import.meta.env.VITE_API_URL)
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api}
+        VITE_API_URL: ${VITE_API_URL:-https://foodstreet.alixblu.site/api}
+        VITE_PAYPAL_CLIENT_ID: ${VITE_PAYPAL_CLIENT_ID:-}
+        VITE_PUBLIC_BASE_URL: ${VITE_PUBLIC_BASE_URL:-https://foodstreet.alixblu.site}
     env_file:
       - ./frontend/.env
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     depends_on:
       - backend
     restart: unless-stopped
+
+  # Terminates HTTPS (Let’s Encrypt) and routes:
+  # - /api* -> backend
+  # - everything else on the main domain -> frontend
+  # - all paths on the admin subdomain -> backend
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
 

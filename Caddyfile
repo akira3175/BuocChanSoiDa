@@ -15,3 +15,10 @@
 		reverse_proxy frontend:80
 	}
 }
+
+foodstreetadmin.alixblu.site {
+	encode gzip
+
+	# Route Django admin (and any admin static) to the backend container
+	reverse_proxy backend:8000
+}
