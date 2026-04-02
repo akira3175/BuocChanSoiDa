@@ -38,6 +38,8 @@ venv.bak/
 
 # --- Environment Variables (QUAN TRỌNG) ---
 .env
+.env.dev
+*.env.dev
 .flaskenv
 
 # --- IDEs/Editors ---
@@ -55,4 +57,3 @@ nosetests.xml
 coverage.xml
 htmlcov/
 .pytest_cache/
-backend/docker-compose.yml

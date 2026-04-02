@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: /home/ubuntu/BuocChanSoiDa/backend
+    env_file:
+      - /home/ubuntu/BuocChanSoiDa/backend/.env.dev
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: /home/ubuntu/BuocChanSoiDa/frontend
+      args:
+        VITE_API_URL: http://localhost:8000/api
+        VITE_PAYPAL_CLIENT_ID: ""
+        VITE_PUBLIC_BASE_URL: http://localhost:3000
+    env_file:
+      - /home/ubuntu/BuocChanSoiDa/frontend/.env.dev
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
