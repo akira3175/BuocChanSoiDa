@@ -164,6 +164,14 @@ def tour_purchase_create(request):
             
         # Nếu đang PENDING, trả về invoice cũ để tiếp tục thanh toán
         if existing.invoice and existing.invoice.status == Invoice.Status.PENDING:
+            # Price may have changed after a previous pending invoice was created.
+            # Keep pending invoice aligned with current tour premium price.
+            if existing.invoice.amount != tour.premium_price:
+                existing.invoice.amount = tour.premium_price
+                existing.invoice.reason = f'Mua tour premium: {tour.tour_name}'
+                # Clear previous order reference so frontend creates a fresh PayPal order.
+                existing.invoice.transaction_code = ''
+                existing.invoice.save(update_fields=['amount', 'reason', 'transaction_code'])
             return Response({
                 'invoice_id': str(existing.invoice.id),
                 'tour_purchase_id': str(existing.id),
