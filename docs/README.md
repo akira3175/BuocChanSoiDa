@@ -131,6 +131,22 @@ docker compose -f docker-compose.test.yml build --no-cache frontend-test
 
 Workflow: `.github/workflows/ci.yml` — runs the same Django tests and Playwright E2E **on the runner** (not via `docker-compose.test.yml`), so CI does not require pulling the large Playwright image every time.
 
+### CD (GitHub Actions)
+
+Workflow: `.github/workflows/cd.yml` — on every `push` to `main`, it SSH-deploys on your EC2 by:
+
+1. `git pull --ff-only origin main` inside `/home/ubuntu/BuocChanSoiDa`
+2. `docker compose up -d --build --remove-orphans`
+3. `docker compose exec -T backend python manage.py migrate --noinput`
+
+Required GitHub secrets (Settings → Secrets and variables → Actions):
+
+| Secret name | Value |
+|-------------|-------|
+| `EC2_HOST` | EC2 public IP or hostname |
+| `EC2_USER` | usually `ubuntu` |
+| `EC2_SSH_KEY` | private SSH key that can log into the EC2 user |
+
 ### Troubleshooting
 
 | Issue | What to do |
