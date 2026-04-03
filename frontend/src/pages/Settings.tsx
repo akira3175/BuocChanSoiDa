@@ -83,6 +83,14 @@ export default function Settings() {
     }, [user, t]);
 
     const hasRegisteredEmail = Boolean(user?.email && !user.email.endsWith('@guest.bcsd.local'));
+    const browserLabel = useMemo(() => {
+        const ua = deviceInfo.userAgent || '';
+        if (ua.includes('Edg/')) return 'Edge';
+        if (ua.includes('Chrome/')) return 'Chrome';
+        if (ua.includes('Firefox/')) return 'Firefox';
+        if (ua.includes('Safari/') && !ua.includes('Chrome/')) return 'Safari';
+        return 'Unknown';
+    }, [deviceInfo.userAgent]);
 
     if (loading) {
         return (
@@ -213,11 +221,19 @@ export default function Settings() {
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-xs text-slate-500">Browser</span>
-                                <span className="text-xs text-slate-600">{deviceInfo.userAgent.split(' ').slice(-2).join(' ')}</span>
+                                <span className="text-xs text-slate-600">{browserLabel}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500">Vendor</span>
+                                <span className="text-xs text-slate-600">{deviceInfo.vendor || '-'}</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-xs text-slate-500">{t('settings.screen')}</span>
                                 <span className="text-xs text-slate-600">{deviceInfo.screenResolution}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500">Color depth</span>
+                                <span className="text-xs text-slate-600">{deviceInfo.colorDepth} bit</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-xs text-slate-500">{t('settings.languageLabel')}</span>
@@ -242,6 +258,16 @@ export default function Settings() {
                                         </span>
                                     )}
                                 </span>
+                            </div>
+                            {deviceInfo.connectionType && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-slate-500">Network type</span>
+                                    <span className="text-xs text-slate-600">{deviceInfo.connectionType}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-500">Cookies</span>
+                                <span className="text-xs text-slate-600">{deviceInfo.cookieEnabled ? 'Enabled' : 'Disabled'}</span>
                             </div>
                             {deviceInfo.memory && (
                                 <div className="flex justify-between items-center">
