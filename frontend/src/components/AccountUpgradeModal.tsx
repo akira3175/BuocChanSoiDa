@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { upgradeGuestAccount, loginUserAccount, getApiErrorMessage } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';
+import axios from 'axios';
 
 interface AccountUpgradeModalProps {
     onClose: () => void;
@@ -46,7 +47,20 @@ export default function AccountUpgradeModal({ onClose }: AccountUpgradeModalProp
             setTimeout(() => {
                 window.location.reload();
             }, 1000);
-        } catch (err: any) {
+        } catch (err: unknown) {
+            // Existing email -> guide user to login mode instead of showing generic error.
+            if (axios.isAxiosError(err)) {
+                const status = err.response?.status;
+                const data = err.response?.data as { code?: string; error?: string } | undefined;
+                if (status === 409 && data?.code === 'EMAIL_EXISTS') {
+                    setMode('login');
+                    setPassword('');
+                    setPasswordConfirm('');
+                    setError(data.error || t('common.alreadyHaveAccount'));
+                    setLoading(false);
+                    return;
+                }
+            }
             setError(getApiErrorMessage(err, t('settings.errorGeneral')));
             setLoading(false);
         }

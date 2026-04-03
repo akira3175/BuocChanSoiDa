@@ -307,7 +307,10 @@ export const guestLogin = async (deviceId: string): Promise<UserAuthSession> => 
 };
 
 export const upgradeGuestAccount = async (payload: { email: string; password: string; password_confirm: string }): Promise<UserAuthSession> => {
-    const { data } = await apiClient.post<UserAuthSession>('/users/upgrade-guest/', payload);
+    const { data } = await apiClient.post<UserAuthSession>('/users/upgrade-guest/', {
+        ...payload,
+        device_id: getOrCreateDeviceId(),
+    });
     setUserAuthSession(data);
     return data;
 };

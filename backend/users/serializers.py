@@ -25,11 +25,6 @@ class UpgradeGuestSerializer(serializers.Serializer):
         style={'input_type': 'password'}
     )
 
-    def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Email này đã được sử dụng.")
-        return value
-
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
             raise serializers.ValidationError(

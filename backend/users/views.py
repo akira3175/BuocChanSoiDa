@@ -63,22 +63,49 @@ class UpgradeGuestView(APIView):
     POST /api/users/upgrade-guest/
     Nâng cấp tài khoản guest thành tài khoản thường (thêm email, password).
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = UpgradeGuestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = request.user
-        # Tùy chọn: kiểm tra xem đúng là guest không
-        if not user.email.endswith('@guest.bcsd.local'):
-            return Response(
-                {'error': 'Tài khoản này không phải là tài khoản Guest.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         new_email = serializer.validated_data['email']
         new_password = serializer.validated_data['password']
+        device_id = (request.data.get('device_id') or '').strip()
+
+        # If email already exists, frontend should send user to login flow.
+        if User.objects.filter(email__iexact=new_email).exists():
+            return Response(
+                {
+                    'code': 'EMAIL_EXISTS',
+                    'error': 'Email này đã được sử dụng. Vui lòng đăng nhập.',
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        user = None
+        if request.user.is_authenticated:
+            user = request.user
+            if not user.email.endswith('@guest.bcsd.local'):
+                return Response(
+                    {'error': 'Tài khoản này không phải là tài khoản Guest.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            if not device_id:
+                return Response(
+                    {'error': 'device_id is required for guest upgrade.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            user = User.objects.filter(
+                device_id=device_id,
+                email__endswith='@guest.bcsd.local'
+            ).first()
+            if not user:
+                return Response(
+                    {'error': 'Không tìm thấy tài khoản Guest cho thiết bị này.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
         user.email = new_email
         user.set_password(new_password)
