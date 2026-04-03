@@ -22,8 +22,8 @@ jobs:
 
             # Update code to the latest main
             git fetch origin main
-            git checkout main
-            git pull --ff-only origin main
+            # If `main` doesn't exist locally on the EC2 box yet, create it from `origin/main`.
+            git checkout -B main origin/main
 
             # Build + restart the production stack
             docker compose up -d --build --remove-orphans
