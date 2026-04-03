@@ -1,0 +1,17 @@
+# E2E tests (Playwright). Matches @playwright/test in package.json.
+# Build: docker build -f Dockerfile.test -t buocchansoida-frontend-test .
+FROM mcr.microsoft.com/playwright:v1.59.1-noble
+
+WORKDIR /app
+
+ENV CI=true
+ENV PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# Critical E2E only (optional runs via compose override / script)
+CMD ["npm", "run", "test:e2e"]

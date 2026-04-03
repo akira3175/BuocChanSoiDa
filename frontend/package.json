@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test --project=critical",
+    "test:e2e:optional": "playwright test --project=optional",
+    "test:e2e:all": "playwright test"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",
@@ -29,6 +32,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@playwright/test": "1.59.1",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.27",
     "eslint": "^9.39.1",

@@ -1,0 +1,54 @@
+# Run all tests inside Docker (no MySQL for backend — SQLite via settings_test).
+#
+#   docker compose -f docker-compose.test.yml build
+#   docker compose -f docker-compose.test.yml run --rm backend-test
+#   docker compose -f docker-compose.test.yml run --rm frontend-test
+#
+# Or: ./scripts/docker-test.sh
+
+services:
+  backend-test:
+    build:
+      context: ./backend
+    # Same env as production backend so tests see PAYPAL_* / DB_* if you use them.
+    # `.env` is dockerignored in the image; vars must come from the host via env_file.
+    env_file:
+      - path: ./backend/.env
+        required: false
+      - path: ./backend/.env.dev
+        required: false
+    command: >
+      python manage.py test core.tests tours.tests payments.tests.test_api_critical
+      --settings=config.settings_test -v 2
+
+  backend-test-optional:
+    build:
+      context: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+      - path: ./backend/.env.dev
+        required: false
+    command: >
+      python manage.py test payments.tests.test_optional
+      --settings=config.settings_test -v 2
+
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.test
+    environment:
+      CI: "true"
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
+    # Avoid Chromium crashes under low default /dev/shm in containers
+    shm_size: "1gb"
+
+  frontend-test-optional:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.test
+    environment:
+      CI: "true"
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
+    command: ["npm", "run", "test:e2e:optional"]
+    shm_size: "1gb"

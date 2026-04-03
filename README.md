@@ -17,6 +17,10 @@
 |   3   |3122410100|Truong Gia Hao|
 |   4   |3122410214|Bui Bao Long|
 
+### Documentation
+
+* **Production deployment & Docker-based testing:** [docs/README.md](docs/README.md)
+
 ### Resources
 
 * [Project Report](https://youtu.be/dQw4w9WgXcQ?si=hLIbE11aBkE04_ls)
