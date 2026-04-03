@@ -20,14 +20,10 @@ jobs:
 
             cd /home/ubuntu/BuocChanSoiDa
 
-            # Update code to the latest main
             git fetch origin main
             # If `main` doesn't exist locally on the EC2 box yet, create it from `origin/main`.
             git checkout -B main origin/main
 
-            # Build + restart the production stack
-            docker compose up -d --build --remove-orphans
-
-            # Run DB migrations inside the backend container
-            docker compose exec -T backend python manage.py migrate --noinput
+            docker compose -f docker-compose.yml up -d --build --remove-orphans
+            docker compose -f docker-compose.yml exec -T backend python manage.py migrate --noinput
 
