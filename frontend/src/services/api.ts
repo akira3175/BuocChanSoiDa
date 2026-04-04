@@ -270,7 +270,7 @@ apiClient.interceptors.response.use(
                                     'Content-Type': 'application/json',
                                     'ngrok-skip-browser-warning': 'true' 
                                 }, 
-                                timeout: 10000 
+                                timeout: 300000 
                             }
                         );
                         const newAccess = (refreshResp.data as any)?.access;
