@@ -6,7 +6,7 @@ import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
-import apiClient, { getApiErrorMessage, uploadPOICoverImage } from '../services/api';
+import apiClient, { getApiErrorMessage, getPartnerMapQrUrl, uploadPOICoverImage } from '../services/api';
 import type { Media, POI, POICategory } from '../types';
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -36,6 +36,18 @@ function languageSelectLabel(code: string): string {
 function voiceRegionLabel(region: string): string {
   if (!region) return 'Mặc định';
   return VOICE_REGION_LABELS[region] ?? region.replace(/_/g, ' ');
+}
+
+function getPublicBaseUrl(): string {
+  const envBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined)?.trim();
+  return (envBase && envBase.length > 0 ? envBase : window.location.origin).replace(/\/+$/, '');
+}
+
+function formatVnExpiry(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 function languageToBCP47(code: string): string {
@@ -105,6 +117,10 @@ export default function PartnerPOI() {
   const [coverImageUrl, setCoverImageUrl] = useState<string>('');
   const [coverUploadError, setCoverUploadError] = useState('');
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [mapQrFullUrl, setMapQrFullUrl] = useState('');
+  const [mapQrExpiresAt, setMapQrExpiresAt] = useState<string | null>(null);
+  const [mapQrLoading, setMapQrLoading] = useState(false);
+  const [mapQrError, setMapQrError] = useState('');
 
 
 
@@ -158,6 +174,57 @@ export default function PartnerPOI() {
       poiMediaLanguages.some((c) => c === prev) ? prev : poiMediaLanguages[0],
     );
   }, [poi?.id, poiMediaLanguages]);
+
+  useEffect(() => {
+    if (!poi?.id) {
+      setMapQrFullUrl('');
+      setMapQrExpiresAt(null);
+      setMapQrError('');
+      return;
+    }
+    let cancelled = false;
+    const loadQr = async () => {
+      setMapQrLoading(true);
+      setMapQrError('');
+      try {
+        const data = await getPartnerMapQrUrl();
+        if (cancelled) return;
+        const base = getPublicBaseUrl();
+        setMapQrFullUrl(`${base}${data.map_path}`);
+        setMapQrExpiresAt(data.expires_at);
+      } catch (err) {
+        if (!cancelled) {
+          setMapQrError(getApiErrorMessage(err, 'Không tạo được mã QR. Vui lòng thử lại.'));
+          setMapQrFullUrl('');
+          setMapQrExpiresAt(null);
+        }
+      } finally {
+        if (!cancelled) setMapQrLoading(false);
+      }
+    };
+    void loadQr();
+    return () => {
+      cancelled = true;
+    };
+  }, [poi?.id]);
+
+  const refreshMapQr = () => {
+    if (!poi?.id) return;
+    setMapQrLoading(true);
+    setMapQrError('');
+    void (async () => {
+      try {
+        const data = await getPartnerMapQrUrl();
+        const base = getPublicBaseUrl();
+        setMapQrFullUrl(`${base}${data.map_path}`);
+        setMapQrExpiresAt(data.expires_at);
+      } catch (err) {
+        setMapQrError(getApiErrorMessage(err, 'Không tạo được mã QR. Vui lòng thử lại.'));
+      } finally {
+        setMapQrLoading(false);
+      }
+    })();
+  };
 
   useEffect(() => {
     const lat = formData.latitude;
@@ -619,27 +686,50 @@ export default function PartnerPOI() {
               </div>
             </div>
 
-            {/* Mã QR Địa Điểm */}
+            {/* Mã QR Địa Điểm (đường dẫn có chữ ký, hiệu lực 1 giờ) */}
             <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm flex flex-col items-center justify-center p-6 text-center">
-              <h4 className="text-sm font-bold text-slate-900 mb-2">Mã QR Địa Điểm</h4>
-              <p className="text-xs text-slate-500 mb-6 max-w-xs">
-                Mã QR chứa đường dẫn trực tiếp đến địa điểm. Bạn có thể in ra đặt trên bàn cho du khách quét.
+              <h4 className="text-sm font-bold text-slate-900 mb-2">Mã QR</h4>
+              <p className="text-xs text-slate-500 mb-4 max-w-xs">
+                Mỗi mã có hiệu lực <span className="font-semibold text-slate-700">1 giờ</span>. In mới hoặc bấm làm mới
+                trước khi in để du khách quét được.
               </p>
+              <button
+                type="button"
+                onClick={() => refreshMapQr()}
+                disabled={mapQrLoading || !poi}
+                className="mb-4 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {mapQrLoading ? 'Đang tạo mã…' : 'Làm mới mã (gia hạn 1 giờ)'}
+              </button>
+              {mapQrError ? (
+                <p className="mb-4 text-xs text-rose-600">{mapQrError}</p>
+              ) : null}
               <div className="rounded-2xl border border-slate-200 p-4 bg-white shadow-sm">
-                <QRCodeSVG
-                  value={`${window.location.origin}/map?poi=${poi.id}`}
-                  size={200}
-                  bgColor="#ffffff"
-                  fgColor="#0f172a"
-                  level="H"
-                  includeMargin={false}
-                />
+                {mapQrLoading && !mapQrFullUrl ? (
+                  <div className="flex h-[200px] w-[200px] items-center justify-center text-xs text-slate-500">
+                    Đang tải…
+                  </div>
+                ) : mapQrFullUrl ? (
+                  <QRCodeSVG
+                    value={mapQrFullUrl}
+                    size={200}
+                    bgColor="#ffffff"
+                    fgColor="#0f172a"
+                    level="H"
+                    includeMargin={false}
+                  />
+                ) : (
+                  <div className="flex h-[200px] w-[200px] items-center justify-center px-2 text-xs text-slate-500">
+                    Chưa có mã
+                  </div>
+                )}
               </div>
               <div className="mt-4 flex flex-col items-center gap-1">
                 <p className="font-bold text-slate-800">{poi.name}</p>
-                <code className="text-[10px] text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">
-                  /map?poi={poi.id}
-                </code>
+                <p className="text-[11px] text-slate-500">
+                  Hết hạn dự kiến:{' '}
+                  <span className="font-medium text-slate-700">{formatVnExpiry(mapQrExpiresAt)}</span>
+                </p>
               </div>
             </div>
           </>

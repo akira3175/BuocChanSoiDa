@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { scanQRCode, getPOIById } from '../services/api';
+import { scanQRCode, getPOIById, resolveMapQrPoi } from '../services/api';
 import type { POI } from '../types';
 
 interface QRScanOverlayProps {
@@ -24,6 +24,23 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
         navigate('/map', { state: { qrPOI: poi } });
         onScanSuccess(poi);
     }, [navigate, onScanSuccess]);
+
+    /** URL /map?poi=&qr= từ mã QR in tại quán (chữ ký có thời hạn). */
+    const extractMapQrFromUrl = (text: string): { poiId: string; qrToken: string } | null => {
+        try {
+            const url = text.startsWith('http://') || text.startsWith('https://')
+                ? new URL(text)
+                : new URL(text, window.location.origin);
+            const poi = url.searchParams.get('poi') || url.searchParams.get('id');
+            const qr = url.searchParams.get('qr');
+            if (poi && qr && /^\/map(\/|$)/.test(url.pathname)) {
+                return { poiId: poi, qrToken: qr };
+            }
+        } catch {
+            /* not a URL */
+        }
+        return null;
+    };
 
     const extractPoiId = (text: string): string | null => {
         // 1. URL pattern
@@ -83,14 +100,20 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
 
         try {
             let poi;
-            const poiId = extractPoiId(decodedText);
-
-            if (poiId) {
-                console.log(`[QR Scan] Extracted POI ID: ${poiId}`);
-                poi = await getPOIById(poiId);
+            const mapQr = extractMapQrFromUrl(decodedText.trim());
+            if (mapQr) {
+                console.log(`[QR Scan] Signed map QR for POI ${mapQr.poiId}`);
+                poi = await resolveMapQrPoi(mapQr.poiId, mapQr.qrToken);
             } else {
-                console.log(`[QR Scan] No ID extracted, calling scanQRCode for raw text: ${decodedText}`);
-                poi = await scanQRCode(decodedText);
+                const poiId = extractPoiId(decodedText);
+
+                if (poiId) {
+                    console.log(`[QR Scan] Extracted POI ID: ${poiId}`);
+                    poi = await getPOIById(poiId);
+                } else {
+                    console.log(`[QR Scan] No ID extracted, calling scanQRCode for raw text: ${decodedText}`);
+                    poi = await scanQRCode(decodedText);
+                }
             }
 
             await handlePOI(poi);

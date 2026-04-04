@@ -1,3 +1,8 @@
+from datetime import timedelta
+from urllib.parse import urlencode
+
+from django.core.signing import BadSignature, SignatureExpired
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -6,6 +11,7 @@ from rest_framework.views import APIView
 import cloudinary.uploader
 
 from .models import Media, POI, Partner
+from .qr_map import MAP_QR_MAX_AGE, sign_poi_map_qr, verify_poi_map_qr
 from .serializers import (
     MediaCRUDSerializer,
     MediaSerializer,
@@ -409,3 +415,92 @@ class POICoverImageView(APIView):
         poi.save(update_fields=['cover_image_url'])
 
         return Response({'cover_image_url': cover_url}, status=status.HTTP_200_OK)
+
+
+class POIMapQrUrlView(APIView):
+    """
+    GET /api/pois/my-poi/qr-map-url/
+
+    Trả về đường dẫn /map?poi=&qr= kèm chữ ký có thời hạn 1 giờ (in mã QR đặt tại quán).
+    """
+
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def get(self, request):
+        partner = Partner.objects.select_related('poi').filter(user=request.user).first()
+        poi = None
+        if partner and partner.poi_id:
+            poi = POI.objects.filter(id=partner.poi_id).first()
+        else:
+            poi = POI.objects.filter(owner=request.user).first()
+        if not poi:
+            return Response({'error': 'No POI found'}, status=status.HTTP_404_NOT_FOUND)
+
+        token = sign_poi_map_qr(poi.id)
+        map_path = '/map?' + urlencode({'poi': str(poi.id), 'qr': token})
+        expires_at = timezone.now() + timedelta(seconds=MAP_QR_MAX_AGE)
+        return Response(
+            {
+                'map_path': map_path,
+                'expires_in_seconds': MAP_QR_MAX_AGE,
+                'expires_at': expires_at.isoformat(),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class POIMapQrResolveView(APIView):
+    """
+    GET /api/pois/map-qr/resolve/?poi=<id>&qr=<signed_token>
+
+    Xác thực chữ ký và trả về POI (cùng shape với GET /api/pois/<id>/).
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        poi_param = request.query_params.get('poi', '').strip()
+        qr_token = request.query_params.get('qr', '').strip()
+        if not poi_param or not qr_token:
+            return Response(
+                {'error': 'Tham số poi và qr là bắt buộc.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            expected_id = int(poi_param)
+        except ValueError:
+            return Response(
+                {'error': 'Tham số poi không hợp lệ.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            verified_id = verify_poi_map_qr(qr_token)
+        except SignatureExpired:
+            return Response(
+                {'error': 'Mã QR đã hết hạn (1 giờ). Vui lòng quét mã mới từ đối tác.'},
+                status=status.HTTP_410_GONE,
+            )
+        except BadSignature:
+            return Response(
+                {'error': 'Mã QR không hợp lệ.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if verified_id != expected_id:
+            return Response(
+                {'error': 'Mã QR không khớp điểm tham quan.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            poi = POI.objects.prefetch_related('media', 'partners').get(
+                id=verified_id,
+                status=POI.Status.ACTIVE,
+            )
+        except POI.DoesNotExist:
+            return Response(
+                {'error': 'Không tìm thấy điểm tham quan.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(
+            POIDetailSerializer(poi, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )

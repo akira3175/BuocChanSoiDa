@@ -10,7 +10,7 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { useGeofence } from '../hooks/useGeofence';
 import { useNarrationEngine } from '../hooks/useNarrationEngine';
 import { unlockAudioAndTTS } from '../hooks/useAudioPlayer';
-import { getPOIsNearMe, getPOIById } from '../services/api';
+import { getPOIsNearMe, getPOIById, resolveMapQrPoi } from '../services/api';
 import { getOfflinePOIsFromPackages } from '../services/offlineStorage';
 import NarrationBottomSheet from '../components/NarrationBottomSheet';
 import QRScanOverlay from '../components/QRScanOverlay';
@@ -207,18 +207,25 @@ export default function MapExplore() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.state]);
 
-    // Khi truy cập qua URL (vd: quét mã QR native browser -> /map?poi=8)
+    // Khi truy cập qua URL (vd: quét mã QR native browser -> /map?poi=8 hoặc /map?poi=8&qr=… có hiệu lực 1h)
     useEffect(() => {
         const searchParams = new URLSearchParams(location.search);
         const poiId = searchParams.get('poi') || searchParams.get('id');
-        if (poiId) {
-            getPOIById(poiId).then(poi => {
+        const qrToken = searchParams.get('qr');
+        if (!poiId) return;
+
+        const load =
+            qrToken != null && qrToken.length > 0
+                ? () => resolveMapQrPoi(poiId, qrToken)
+                : () => getPOIById(poiId);
+
+        load()
+            .then((poi) => {
                 unlockAudioAndTTS();
                 triggerNarration(poi, 'QR');
-                // Xoá tham số URL để không trigger lại khi re-render
                 navigate('/map', { replace: true, state: location.state });
-            }).catch(console.error);
-        }
+            })
+            .catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.search]);
 

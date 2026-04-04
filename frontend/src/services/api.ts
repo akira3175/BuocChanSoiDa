@@ -538,6 +538,26 @@ export const scanQRCode = async (code: string): Promise<POI> => {
     return data;
 };
 
+export interface PartnerMapQrUrlResponse {
+    map_path: string;
+    expires_in_seconds: number;
+    expires_at: string;
+}
+
+/** Signed /map?poi=&qr= URL for printed venue QR (valid 1 hour). Requires partner auth. */
+export const getPartnerMapQrUrl = async (): Promise<PartnerMapQrUrlResponse> => {
+    const { data } = await apiClient.get<PartnerMapQrUrlResponse>('/pois/my-poi/qr-map-url/');
+    return data;
+};
+
+/** Resolve POI from signed map QR token (same response shape as getPOIById). */
+export const resolveMapQrPoi = async (poiId: string, qrToken: string): Promise<POI> => {
+    const { data } = await apiClient.get<POI>('/pois/map-qr/resolve/', {
+        params: { poi: poiId, qr: qrToken },
+    });
+    return data;
+};
+
 export const uploadPOICoverImage = async (file: File): Promise<{ cover_image_url: string }> => {
     const formData = new FormData();
     formData.append('image', file);
