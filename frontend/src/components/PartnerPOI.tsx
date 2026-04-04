@@ -6,7 +6,7 @@ import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
-import apiClient, { getApiErrorMessage } from '../services/api';
+import apiClient, { getApiErrorMessage, uploadPOICoverImage } from '../services/api';
 import type { Media, POI, POICategory } from '../types';
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -101,6 +101,10 @@ export default function PartnerPOI() {
   /** Ngôn ngữ đang xem trong danh sách media POI (combo, không hiện tất cả cùng lúc). */
   const [poiMediaLang, setPoiMediaLang] = useState<string>('');
   const [playingMediaId, setPlayingMediaId] = useState<string | null>(null);
+  const [uploadCoverLoading, setUploadCoverLoading] = useState(false);
+  const [coverImageUrl, setCoverImageUrl] = useState<string>('');
+  const [coverUploadError, setCoverUploadError] = useState('');
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
 
 
@@ -120,6 +124,7 @@ export default function PartnerPOI() {
           longitude: data.longitude,
           geofence_radius: data.geofence_radius || 50,
         });
+        setCoverImageUrl(data.cover_image_url || '');
       } catch (err) {
         setPoi(null);
         const status = axios.isAxiosError(err) ? err.response?.status : undefined;
@@ -269,9 +274,11 @@ export default function PartnerPOI() {
       if (poi) {
         const { data } = await apiClient.put<POI>('/pois/my-poi/', formData);
         setPoi(data);
+        setCoverImageUrl(data.cover_image_url || '');
       } else {
         const { data } = await apiClient.post<POI>('/pois/my-poi/', formData);
         setPoi(data);
+        setCoverImageUrl(data.cover_image_url || '');
       }
       setNotice('');
       alert('Đã lưu POI thành công.');
@@ -286,6 +293,26 @@ export default function PartnerPOI() {
       setSaving(false);
     }
   };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input value to allow re-selecting same file
+    if (coverInputRef.current) coverInputRef.current.value = '';
+    setCoverUploadError('');
+    setUploadCoverLoading(true);
+    try {
+      const result = await uploadPOICoverImage(file);
+      setCoverImageUrl(result.cover_image_url);
+      if (poi) {
+        setPoi({ ...poi, cover_image_url: result.cover_image_url });
+      }
+    } catch (err) {
+      setCoverUploadError(getApiErrorMessage(err, 'Upload ảnh thất bại. Vui lòng thử lại.'));
+    } finally {
+      setUploadCoverLoading(false);
+    }
+  };;
 
 
 
@@ -528,28 +555,94 @@ export default function PartnerPOI() {
         )}
 
         {poi && (
-          <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm flex flex-col items-center justify-center p-6 text-center">
-            <h4 className="text-sm font-bold text-slate-900 mb-2">Mã QR Địa Điểm</h4>
-            <p className="text-xs text-slate-500 mb-6 max-w-xs">
-              Mã QR chứa đường dẫn trực tiếp đến địa điểm. Bạn có thể in ra đặt trên bàn cho du khách quét.
-            </p>
-            <div className="rounded-2xl border border-slate-200 p-4 bg-white shadow-sm">
-              <QRCodeSVG
-                value={`${window.location.origin}/map?poi=${poi.id}`}
-                size={200}
-                bgColor="#ffffff"
-                fgColor="#0f172a"
-                level="H"
-                includeMargin={false}
-              />
+          <>
+            {/* Ảnh bìa POI */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
+              <div className="relative">
+                {coverImageUrl ? (
+                  <div className="relative h-44 w-full overflow-hidden bg-slate-100">
+                    <img
+                      src={coverImageUrl}
+                      alt="Ảnh bìa POI"
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent" />
+                    <span className="absolute bottom-2 left-3 rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold text-white shadow">
+                      ✓ Đã có ảnh bìa
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex h-44 w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-50 to-slate-100">
+                    <span className="material-symbols-outlined text-5xl text-slate-300">image</span>
+                    <p className="text-xs font-medium text-slate-400">Chưa có ảnh bìa</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">Ảnh bìa</h4>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      Hiển thị trên bản đồ và bottom sheet thược minh. Tỷ lệ 16:9 được khuyến nghị.
+                    </p>
+                    {coverUploadError && (
+                      <p className="mt-1 text-[11px] font-medium text-rose-600">{coverUploadError}</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={uploadCoverLoading || !poi}
+                    onClick={() => coverInputRef.current?.click()}
+                    className="flex shrink-0 items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {uploadCoverLoading ? (
+                      <>
+                        <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                        Đang tải...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[16px]">upload</span>
+                        {coverImageUrl ? 'Đổi ảnh' : 'Tải ảnh lên'}
+                      </>
+                    )}
+                  </button>
+                </div>
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => void handleCoverUpload(e)}
+                />
+              </div>
             </div>
-            <div className="mt-4 flex flex-col items-center gap-1">
-              <p className="font-bold text-slate-800">{poi.name}</p>
-              <code className="text-[10px] text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">
-                /map?poi={poi.id}
-              </code>
+
+            {/* Mã QR Địa Điểm */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm flex flex-col items-center justify-center p-6 text-center">
+              <h4 className="text-sm font-bold text-slate-900 mb-2">Mã QR Địa Điểm</h4>
+              <p className="text-xs text-slate-500 mb-6 max-w-xs">
+                Mã QR chứa đường dẫn trực tiếp đến địa điểm. Bạn có thể in ra đặt trên bàn cho du khách quét.
+              </p>
+              <div className="rounded-2xl border border-slate-200 p-4 bg-white shadow-sm">
+                <QRCodeSVG
+                  value={`${window.location.origin}/map?poi=${poi.id}`}
+                  size={200}
+                  bgColor="#ffffff"
+                  fgColor="#0f172a"
+                  level="H"
+                  includeMargin={false}
+                />
+              </div>
+              <div className="mt-4 flex flex-col items-center gap-1">
+                <p className="font-bold text-slate-800">{poi.name}</p>
+                <code className="text-[10px] text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded">
+                  /map?poi={poi.id}
+                </code>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </section>

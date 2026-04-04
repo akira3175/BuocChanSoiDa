@@ -338,3 +338,74 @@ class PartnerMyPOIView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
         poi.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class POICoverImageView(APIView):
+    """
+    POST /api/pois/my-poi/cover-image/
+
+    Partner upload ảnh bìa cho POI của mình lên Cloudinary.
+    Chấp nhận multipart/form-data với field 'image'.
+    Response: { cover_image_url: <url> }
+    """
+    permission_classes = [IsAuthenticated, IsPartner]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        # Tìm POI của partner (theo link hoặc owner)
+        partner = Partner.objects.select_related('poi').filter(user=request.user).first()
+        if partner and partner.poi_id:
+            poi = POI.objects.filter(id=partner.poi_id).first()
+        else:
+            poi = POI.objects.filter(owner=request.user).first()
+
+        if not poi:
+            return Response(
+                {'error': 'Không tìm thấy POI. Vui lòng tạo POI trước.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        image_file = request.FILES.get('image')
+        if not image_file:
+            return Response(
+                {'error': 'Vui lòng chọn file ảnh để upload.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Kiểm tra định dạng file (cho phép các định dạng ảnh phổ biến)
+        allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+        if image_file.content_type not in allowed_types:
+            return Response(
+                {'error': 'Định dạng ảnh không hợp lệ. Vui lòng dùng JPG, PNG, WebP hoặc GIF.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Giới hạn kích thước 10MB
+        if image_file.size > 10 * 1024 * 1024:
+            return Response(
+                {'error': 'File ảnh quá lớn. Kích thước tối đa là 10MB.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            uploaded = cloudinary.uploader.upload(
+                image_file,
+                resource_type='image',
+                folder='bcsd/poi-covers',
+                public_id=f'poi_{poi.id}_cover',
+                overwrite=True,
+                transformation=[
+                    {'width': 1200, 'height': 630, 'crop': 'fill', 'quality': 'auto:good'},
+                ],
+            )
+            cover_url = uploaded.get('secure_url', '')
+        except Exception:
+            return Response(
+                {'error': 'Upload ảnh thất bại. Vui lòng thử lại.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        poi.cover_image_url = cover_url
+        poi.save(update_fields=['cover_image_url'])
+
+        return Response({'cover_image_url': cover_url}, status=status.HTTP_200_OK)

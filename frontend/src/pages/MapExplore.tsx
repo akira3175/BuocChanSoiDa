@@ -311,6 +311,15 @@ export default function MapExplore() {
                                 }}
                             >
                                 <Popup minWidth={220} maxWidth={300}>
+                                    {(poi.cover_image_url || poi.image_url) && (
+                                        <div className="w-full h-32 mb-3 -mt-1 -mx-1 overflow-hidden" style={{ width: 'calc(100% + 8px)' }}>
+                                            <img
+                                                src={poi.cover_image_url || poi.image_url}
+                                                alt={poi.name}
+                                                className="w-full h-full object-cover rounded-t-lg"
+                                            />
+                                        </div>
+                                    )}
                                     <div className="text-sm font-semibold">{poi.translated_name || poi.name}</div>
                                     <div className="text-xs text-slate-600 mt-1 leading-relaxed line-clamp-4">
                                         {(poi.translated_description || poi.description).slice(0, 150)}
@@ -396,6 +405,19 @@ export default function MapExplore() {
                                 onClick={() => handleSearchResultClick(poi)}
                                 className="w-full px-4 py-3 border-b border-slate-100 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left flex items-start gap-3 last:border-b-0"
                             >
+                                {poi.cover_image_url || poi.image_url ? (
+                                    <img
+                                        src={poi.cover_image_url || poi.image_url}
+                                        alt=""
+                                        className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
+                                    />
+                                ) : (
+                                    <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center bg-slate-100 rounded-lg text-slate-400">
+                                        <span className="material-symbols-outlined text-[20px]">
+                                            {poi.category === 'food' ? 'restaurant' : 'castle'}
+                                        </span>
+                                    </div>
+                                )}
                                 <div className="flex-1 min-w-0">
                                     <p className="font-semibold text-sm text-slate-900 truncate">{poi.translated_name || poi.name}</p>
                                     <p className="text-xs text-slate-500 line-clamp-2">
@@ -403,9 +425,11 @@ export default function MapExplore() {
                                         {(poi.translated_description || poi.description).length > 80 ? '...' : ''}
                                     </p>
                                 </div>
-                                <span className="material-symbols-outlined text-slate-400 text-[18px] flex-shrink-0">
-                                    {poi.category === 'food' ? 'restaurant' : 'castle'}
-                                </span>
+                                {!(poi.cover_image_url || poi.image_url) && (
+                                    <span className="material-symbols-outlined text-slate-300 text-[18px] flex-shrink-0 mt-1">
+                                        chevron_right
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </div>

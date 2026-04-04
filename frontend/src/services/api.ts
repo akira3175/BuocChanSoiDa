@@ -35,7 +35,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 10000,
+    timeout: 3000000,
     headers: { 
         'Content-Type': 'application/json',
         'ngrok-skip-browser-warning': 'true', // Bypass ngrok warning page
@@ -270,7 +270,7 @@ apiClient.interceptors.response.use(
                                     'Content-Type': 'application/json',
                                     'ngrok-skip-browser-warning': 'true' 
                                 }, 
-                                timeout: 300000 
+                                timeout: 30000
                             }
                         );
                         const newAccess = (refreshResp.data as any)?.access;
@@ -519,6 +519,17 @@ export const getPOIById = async (id: string): Promise<POI> => {
 
 export const scanQRCode = async (code: string): Promise<POI> => {
     const { data } = await apiClient.get<POI>('/pois/scan/', { params: { code } });
+    return data;
+};
+
+export const uploadPOICoverImage = async (file: File): Promise<{ cover_image_url: string }> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const { data } = await apiClient.post<{ cover_image_url: string }>(
+        '/pois/my-poi/cover-image/',
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
     return data;
 };
 

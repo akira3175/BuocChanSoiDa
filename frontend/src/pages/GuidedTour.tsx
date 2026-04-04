@@ -445,6 +445,15 @@ export default function GuidedTour() {
                                             }}
                                         >
                                             <Popup minWidth={200} maxWidth={280}>
+                                                {(tp.poi.cover_image_url || tp.poi.image_url) && (
+                                                    <div className="w-full h-32 mb-3 -mt-1 -mx-1 overflow-hidden" style={{ width: 'calc(100% + 8px)' }}>
+                                                        <img
+                                                            src={tp.poi.cover_image_url || tp.poi.image_url}
+                                                            alt={tp.poi.name}
+                                                            className="w-full h-full object-cover rounded-t-lg"
+                                                        />
+                                                    </div>
+                                                )}
                                                 <div className="text-sm font-semibold">{tp.poi.translated_name || tp.poi.name}</div>
                                                 <div className="text-xs text-slate-600 mt-1 leading-relaxed line-clamp-3">
                                                     {(tp.poi.translated_description || tp.poi.description).slice(0, 150)}

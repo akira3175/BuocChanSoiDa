@@ -80,9 +80,9 @@ class POIAdmin(admin.ModelAdmin):
     form = POIAdminForm
     list_display = [
         'id', 'name', 'category', 'latitude', 'longitude', 'geofence_radius',
-        'status_badge', 'created_at', 'updated_at', 'narration_count',
+        'status_badge', 'cover_thumbnail', 'created_at', 'updated_at', 'narration_count',
     ]
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['created_at', 'updated_at', 'cover_preview']
     list_filter = ['status', 'category']
     search_fields = ['name', 'description', 'qr_code_data']
     ordering = ['name']
@@ -94,6 +94,10 @@ class POIAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Thông tin cơ bản', {
             'fields': ('name', 'description', 'category', 'status', 'created_at', 'updated_at'),
+        }),
+        ('🖼️ Ảnh bìa', {
+            'fields': ('cover_image_url', 'cover_preview'),
+            'description': 'URL ảnh bìa hiển thị cho điểm tham quan (thường được tự động cập nhật khi Partner upload).',
         }),
         ('📍 Vị trí & Geofence', {
             'description': (
@@ -141,6 +145,28 @@ class POIAdmin(admin.ModelAdmin):
         count = obj.narration_logs.count()
         return format_html('<span style="font-weight:600;color:#0066cc">🎧 {}</span>', count)
     narration_count.short_description = 'Lượt nghe'
+
+    def cover_thumbnail(self, obj):
+        if obj.cover_image_url:
+            return format_html(
+                '<img src="{}" style="height:36px;width:64px;object-fit:cover;border-radius:4px;border:1px solid #e2e8f0" />',
+                obj.cover_image_url,
+            )
+        return format_html('<span style="color:#ccc;font-size:11px">— Chưa có ảnh</span>')
+    cover_thumbnail.short_description = 'Ảnh bìa'
+
+    def cover_preview(self, obj):
+        if obj.cover_image_url:
+            return format_html(
+                '<div style="margin-top:4px">'
+                '<img src="{}" style="max-width:480px;max-height:240px;border-radius:8px;border:1px solid #e2e8f0;object-fit:cover" />'
+                '<br><a href="{}" target="_blank" style="font-size:11px;color:#0066cc">&#128279; {}</a>'
+                '</div>',
+                obj.cover_image_url, obj.cover_image_url,
+                obj.cover_image_url[:80] + '...' if len(obj.cover_image_url) > 80 else obj.cover_image_url,
+            )
+        return format_html('<span style="color:#999">⚠️ Chưa có ảnh bìa</span>')
+    cover_preview.short_description = '🖼️ Xem trước ảnh bìa'
 
 
 # ─── Media Admin ─────────────────────────────────────────────────────────────

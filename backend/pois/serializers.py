@@ -42,10 +42,11 @@ class POIListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'translated_name', 'description', 'translated_description',
             'latitude', 'longitude', 'geofence_radius',
-            'category', 'qr_code_data', 'status',
+            'category', 'cover_image_url', 'qr_code_data', 'status',
             'created_at', 'updated_at',
             'distance',
         ]
+        validators = []  # Vô hiệu hoá auto-validator của DRF để tránh KeyError trong partial update. Logic đã được check trong view và model.
 
     def get_translated_name(self, obj):
         request = self.context.get('request')
@@ -102,10 +103,11 @@ class POIDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'translated_name', 'description', 'translated_description',
             'latitude', 'longitude', 'geofence_radius',
-            'category', 'qr_code_data', 'status',
+            'category', 'cover_image_url', 'qr_code_data', 'status',
             'created_at', 'updated_at',
             'media', 'partners',
         ]
+        validators = []
 
     def get_translated_name(self, obj):
         request = self.context.get('request')

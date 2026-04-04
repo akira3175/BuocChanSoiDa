@@ -51,7 +51,7 @@ export default function NarrationBottomSheet({ poi, media, partners, onClose }: 
         onEnded: handlePOIEnded,
     });
 
-    const { localUrl: poiImageUrl, isOffline: isPoiImageOffline } = useOfflineMedia(poi.image_url);
+    const { localUrl: poiImageUrl, isOffline: isPoiImageOffline } = useOfflineMedia(poi.cover_image_url || poi.image_url);
 
     // Load audio khi mount hoặc khi media/poi thay đổi
     useEffect(() => {

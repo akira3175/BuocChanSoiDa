@@ -7,6 +7,7 @@ urlpatterns = [
     # POI endpoints
     path('near-me/', views.POINearMeView.as_view(), name='near-me'),
     path('my-poi/', views.PartnerMyPOIView.as_view(), name='my-poi'),
+    path('my-poi/cover-image/', views.POICoverImageView.as_view(), name='my-poi-cover-image'),
     path('scan/', views.POIScanView.as_view(), name='scan'),
     path('<int:pk>/', views.POIDetailView.as_view(), name='detail'),
     path('<int:poi_id>/media/', views.POIMediaView.as_view(), name='media'),

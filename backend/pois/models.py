@@ -26,6 +26,13 @@ class POI(models.Model):
         help_text='Bán kính tính bằng mét để kích hoạt Narration Engine.'
     )
     category = models.CharField('Danh mục', max_length=100, blank=True, default='')
+    cover_image_url = models.URLField(
+        'Ảnh bìa',
+        max_length=1024,
+        blank=True,
+        default='',
+        help_text='URL ảnh bìa đại diện của điểm tham quan (upload lên Cloudinary).',
+    )
     qr_code_data = models.CharField(
         'Dữ liệu QR Code',
         max_length=512,

@@ -42,6 +42,7 @@ export interface POI {
     updated_at?: string;
     distance?: number; // field inject từ near-me view (mét)
     image_url?: string;
+    cover_image_url?: string;
     address?: string;
     translated_name?: string;
     translated_description?: string;
