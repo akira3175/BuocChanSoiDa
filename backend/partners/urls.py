@@ -14,6 +14,7 @@ urlpatterns = [
     path('account/profile/', views.PartnerProfileView.as_view(), name='account-profile'),
     path('account/deactivate/', views.PartnerDeactivateView.as_view(), name='account-deactivate'),
     path('account/change-password/', views.PartnerChangePasswordView.as_view(), name='account-change-password'),
+    path('account/analytics/', views.PartnerAnalyticsView.as_view(), name='account-analytics'),
 
     # Partner business CRUD endpoints
     path('', views.PartnerListCreateView.as_view(), name='list-create'),

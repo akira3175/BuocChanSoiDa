@@ -314,6 +314,7 @@ class PartnerApproveView(APIView):
         )
 
 
+
 class PartnerRejectView(APIView):
     """
     POST /api/partners/<id>/reject/
@@ -346,3 +347,90 @@ class PartnerRejectView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class PartnerAnalyticsView(APIView):
+    """
+    GET /api/partners/account/analytics/
+
+    Trả về số liệu thực từ DB (NarrationLog) cho POI của partner đang đăng nhập.
+    Metrics:
+      - impressions      : tổng số lượt narration được kích hoạt (7 ngày qua & tuần trước)
+      - interactions     : lượt có duration > 0 giây (người dùng thực sự nghe)
+      - qr_scans         : lượt kích hoạt qua QR
+      - avg_listen_sec   : thời lượng nghe trung bình (giây)
+      - ctr              : interaction / impression (%)
+      - wow_*            : % thay đổi so với 7 ngày trước đó (week-over-week)
+    """
+
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def get(self, request):
+        from datetime import timedelta
+        from django.utils import timezone
+        from django.db.models import Count, Avg, Q
+        from analytics.models import NarrationLog
+
+        try:
+            partner = Partner.objects.select_related('poi').get(user=request.user)
+        except Partner.DoesNotExist:
+            return Response(
+                {'detail': 'Không tìm thấy hồ sơ đối tác.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        poi_id = partner.poi_id
+        if not poi_id:
+            return Response({
+                'impressions': 0,
+                'interactions': 0,
+                'qr_scans': 0,
+                'avg_listen_sec': 0,
+                'ctr': 0.0,
+                'wow_impressions': None,
+                'wow_interactions': None,
+                'has_poi': False,
+            })
+
+        now = timezone.now()
+        week_start = now - timedelta(days=7)
+        prev_week_start = now - timedelta(days=14)
+
+        base_qs = NarrationLog.objects.filter(
+            poi_id=poi_id,
+            status=NarrationLog.Status.ACTIVE,
+        )
+
+        # --- Tuần này (7 ngày qua) ---
+        this_week = base_qs.filter(start_time__gte=week_start)
+        impressions = this_week.count()
+        interactions = this_week.filter(duration__gt=0).count()
+        qr_scans = this_week.filter(trigger_type=NarrationLog.TriggerType.QR).count()
+        avg_agg = this_week.filter(duration__gt=0).aggregate(avg=Avg('duration'))
+        avg_listen_sec = round(avg_agg['avg'] or 0)
+        ctr = round((interactions / impressions * 100), 1) if impressions > 0 else 0.0
+
+        # --- Tuần trước (để tính WoW) ---
+        prev_week = base_qs.filter(
+            start_time__gte=prev_week_start,
+            start_time__lt=week_start,
+        )
+        prev_impressions = prev_week.count()
+        prev_interactions = prev_week.filter(duration__gt=0).count()
+
+        def wow_pct(current, previous):
+            if previous == 0:
+                return None  # không có dữ liệu tuần trước → không tính
+            return round((current - previous) / previous * 100, 1)
+
+        return Response({
+            'impressions': impressions,
+            'interactions': interactions,
+            'qr_scans': qr_scans,
+            'avg_listen_sec': avg_listen_sec,
+            'ctr': ctr,
+            'wow_impressions': wow_pct(impressions, prev_impressions),
+            'wow_interactions': wow_pct(interactions, prev_interactions),
+            'has_poi': True,
+        })
+

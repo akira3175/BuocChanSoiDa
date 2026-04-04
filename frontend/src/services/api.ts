@@ -394,6 +394,22 @@ export const upsertPartnerAccountProfile = async (payload: Partial<Partner>): Pr
     return data;
 };
 
+export interface PartnerAnalyticsData {
+    impressions: number;
+    interactions: number;
+    qr_scans: number;
+    avg_listen_sec: number;
+    ctr: number;
+    wow_impressions: number | null;
+    wow_interactions: number | null;
+    has_poi: boolean;
+}
+
+export const getPartnerAnalytics = async (): Promise<PartnerAnalyticsData> => {
+    const { data } = await apiClient.get<PartnerAnalyticsData>('/partners/account/analytics/');
+    return data;
+};
+
 /** Tắt hồ sơ Partner (và POI nếu bạn là chủ sở hữu POI). */
 export const deactivatePartnerAccount = async (): Promise<PartnerDeactivateResponse> => {
     const { data } = await apiClient.post<PartnerDeactivateResponse>('/partners/account/deactivate/', {});

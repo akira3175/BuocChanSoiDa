@@ -5,9 +5,11 @@ import {
   deactivatePartnerAccount,
   getApiErrorMessage,
   getPartnerAccountProfile,
+  getPartnerAnalytics,
   isPartnerAuthenticated,
   logoutPartner,
   upsertPartnerAccountProfile,
+  type PartnerAnalyticsData,
 } from '../services/api';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import PartnerPOI from '../components/PartnerPOI';
@@ -24,13 +26,7 @@ interface PartnerDraft {
   menuPriceRange: string;
 }
 
-interface CampaignStat {
-  label: string;
-  value: string;
-  trend: string;
-  trendUp: boolean;
-  icon: string;
-}
+
 
 const DEFAULT_DRAFT: PartnerDraft = {
   businessName: '',
@@ -130,45 +126,15 @@ export default function PartnerPortal() {
   const [deactivating, setDeactivating] = useState(false);
   const { isPlaying, speakTTS, pause } = useAudioPlayer();
   const publicBaseUrl = useMemo(() => getPublicBaseUrl(), []);
+  const [analyticsData, setAnalyticsData] = useState<PartnerAnalyticsData | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
 
   const effectiveQrUrl = useMemo(() => {
     if (!partnerPoiId) return '';
     return buildScanQrUrl(publicBaseUrl, partnerPoiId);
   }, [partnerPoiId, publicBaseUrl]);
 
-  const stats = useMemo<CampaignStat[]>(
-    () => [
-      {
-        label: 'Lượt hiển thị',
-        value: '12,480',
-        trend: '+18% WoW',
-        trendUp: true,
-        icon: 'visibility',
-      },
-      {
-        label: 'Lượt tương tác',
-        value: '3,296',
-        trend: '+9% WoW',
-        trendUp: true,
-        icon: 'touch_app',
-      },
-      {
-        label: 'Lượt xem menu',
-        value: '1,204',
-        trend: '-2% WoW',
-        trendUp: false,
-        icon: 'restaurant_menu',
-      },
-      {
-        label: 'Tỉ lệ chuyển đổi',
-        value: '9.7%',
-        trend: '+1.4 pts',
-        trendUp: true,
-        icon: 'trending_up',
-      },
-    ],
-    []
-  );
 
   const handleFieldChange = (key: keyof PartnerDraft, value: string) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -282,12 +248,7 @@ export default function PartnerPortal() {
     }
   };
 
-  const kpiSummary = useMemo(() => {
-    const interaction = 3296;
-    const impression = 12480;
-    const ctr = ((interaction / impression) * 100).toFixed(1);
-    return `${ctr}% CTR`;
-  }, []);
+
 
   const statusClassName =
     approvalStatus === 'approved'
@@ -390,6 +351,25 @@ export default function PartnerPortal() {
     return () => {
       cancelled = true;
     };
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'analytics') return;
+    if (!isPartnerAuthenticated()) return;
+    let cancelled = false;
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    void (async () => {
+      try {
+        const data = await getPartnerAnalytics();
+        if (!cancelled) setAnalyticsData(data);
+      } catch (err) {
+        if (!cancelled) setAnalyticsError(getApiErrorMessage(err, 'Không tải được dữ liệu thống kê.'));
+      } finally {
+        if (!cancelled) setAnalyticsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [activeTab]);
 
   const renderProfileTab = () => (
@@ -748,30 +728,100 @@ export default function PartnerPortal() {
     );
   };
 
-  const renderAnalyticsTab = () => (
-    <section className="mx-4 mt-4 mb-5 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm animate-stagger-item">
-      <h3 className="text-base font-bold text-slate-900">4) Theo dõi hiệu quả</h3>
-      <p className="mt-1 text-xs text-slate-500">Dashboard ghi nhận lượt hiển thị, tương tác và tối ưu chiến dịch tiếp thị.</p>
+  const renderAnalyticsTab = () => {
+    const fmtWow = (v: number | null | undefined): { label: string; up: boolean } | null => {
+      if (v == null) return null;
+      return { label: `${v > 0 ? '+' : ''}${v}% WoW`, up: v >= 0 };
+    };
+    const fmtSec = (s: number) => s >= 60 ? `${Math.floor(s / 60)}p${s % 60 > 0 ? ` ${s % 60}s` : ''}` : `${s}s`;
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {stats.map((stat) => (
-          <div key={stat.label} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-            <div className="flex items-center justify-between">
-              <span className="material-symbols-outlined text-[18px] text-slate-500">{stat.icon}</span>
-              <span className={`text-[10px] font-bold ${stat.trendUp ? 'text-emerald-600' : 'text-rose-500'}`}>{stat.trend}</span>
-            </div>
-            <p className="mt-1 text-lg font-extrabold text-slate-900">{stat.value}</p>
-            <p className="text-[11px] font-medium text-slate-500">{stat.label}</p>
+    const stats = analyticsData ? [
+      {
+        label: 'Lượt nghe',
+        value: analyticsData.impressions.toLocaleString('vi-VN'),
+        wow: fmtWow(analyticsData.wow_impressions),
+        icon: 'hearing',
+      },
+      {
+        label: 'Lượt tương tác',
+        value: analyticsData.interactions.toLocaleString('vi-VN'),
+        wow: fmtWow(analyticsData.wow_interactions),
+        icon: 'touch_app',
+      },
+      {
+        label: 'Lượt QR',
+        value: analyticsData.qr_scans.toLocaleString('vi-VN'),
+        wow: null,
+        icon: 'qr_code_scanner',
+      },
+      {
+        label: 'Thời lượng TB',
+        value: fmtSec(analyticsData.avg_listen_sec),
+        wow: null,
+        icon: 'timer',
+      },
+    ] : [];
+
+    return (
+      <section className="mx-4 mt-4 mb-5 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm animate-stagger-item">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>monitoring</span>
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Theo dõi hiệu quả</h3>
+            <p className="text-[10px] text-slate-500">Dữ liệu thực • 7 ngày gần nhất</p>
           </div>
-        ))}
-      </div>
+        </div>
 
-      <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
-        <p className="text-xs font-semibold text-slate-700">Tổng quan chiến dịch hiện tại</p>
-        <p className="mt-1 text-sm font-bold text-primary">{kpiSummary} • POI hiệu quả nhất: Chợ đêm Vĩnh Khánh</p>
-      </div>
-    </section>
-  );
+        {analyticsLoading ? (
+          <div className="mt-4 flex flex-col items-center gap-2 py-6">
+            <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-slate-400">Đang tải dữ liệu...</p>
+          </div>
+        ) : analyticsError ? (
+          <div className="mt-3 rounded-xl bg-rose-50 border border-rose-200 p-3">
+            <p className="text-xs font-semibold text-rose-700">{analyticsError}</p>
+          </div>
+        ) : !analyticsData?.has_poi ? (
+          <div className="mt-4 flex flex-col items-center gap-2 py-6 text-center">
+            <span className="material-symbols-outlined text-3xl text-slate-300">bar_chart</span>
+            <p className="text-sm font-semibold text-slate-600">Chưa có dữ liệu</p>
+            <p className="text-xs text-slate-400">Hãy liên kết POI ở tab POI để bắt đầu thu thập số liệu.</p>
+          </div>
+        ) : (
+          <>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {stats.map((stat) => (
+                <div key={stat.label} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="material-symbols-outlined text-[18px] text-primary/70">{stat.icon}</span>
+                    {stat.wow ? (
+                      <span className={`text-[10px] font-bold ${stat.wow.up ? 'text-emerald-600' : 'text-rose-500'}`}>
+                        {stat.wow.label}
+                      </span>
+                    ) : <span />}
+                  </div>
+                  <p className="mt-1 text-lg font-extrabold text-slate-900">{stat.value}</p>
+                  <p className="text-[11px] font-medium text-slate-500">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <p className="text-xs font-semibold text-slate-700">Tổng quan chiến dịch</p>
+              <p className="mt-1 text-sm font-bold text-primary">{analyticsData.ctr}% CTR</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                {analyticsData.interactions} / {analyticsData.impressions} lượt nghe có tương tác thực sự
+              </p>
+            </div>
+
+            <p className="mt-2 text-center text-[10px] text-slate-400">Dữ liệu từ NarrationLog · cập nhật mỗi lần mở tab</p>
+          </>
+        )}
+      </section>
+    );
+  };
 
   return (
     <AppLayout
@@ -805,7 +855,10 @@ export default function PartnerPortal() {
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
-            {stats.slice(0, 2).map((stat) => (
+            {[
+              { label: 'Lượt nghe', value: analyticsData ? analyticsData.impressions.toLocaleString('vi-VN') : '—' },
+              { label: 'Tương tác', value: analyticsData ? analyticsData.interactions.toLocaleString('vi-VN') : '—' },
+            ].map((stat) => (
               <div key={stat.label} className="rounded-2xl border border-white/70 bg-white/80 p-3 backdrop-blur-sm">
                 <p className="text-[11px] font-semibold text-slate-500">{stat.label}</p>
                 <p className="mt-1 text-xl font-extrabold tracking-tight text-slate-900">{stat.value}</p>
