@@ -420,7 +420,7 @@ export default function MapExplore() {
             </div>
 
             {/* FAB STACK */}
-            <div className="relative z-20 mt-auto flex flex-col items-end gap-3 px-4 pb-2 mx-auto w-full max-w-2xl lg:max-w-4xl">
+            <div className="relative z-20 mt-auto self-end flex flex-col items-end gap-3 px-4 pb-20">
                 {/* Filter */}
                 <button className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-slate-700 shadow-lg">
                     <span className="material-symbols-outlined">tune</span>

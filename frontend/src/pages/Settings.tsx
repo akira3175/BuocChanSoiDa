@@ -22,7 +22,9 @@ export default function Settings() {
     const navigate = useNavigate();
     const { user, dispatch } = useApp();
     const deviceInfo = useDeviceInfo();
-    const [language, setLanguage] = useState<Language>(user?.preferred_language || 'vi');
+    const [language, setLanguage] = useState<Language>(
+        (localStorage.getItem('bcsd_language') as Language) || user?.preferred_language || 'vi'
+    );
     const [voiceRegion] = useState<VoiceRegion>(user?.preferred_voice_region || 'mien_nam');
     const [saved, setSaved] = useState(false);
     const [loading, setLoading] = useState(true);

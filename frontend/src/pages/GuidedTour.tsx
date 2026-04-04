@@ -663,7 +663,7 @@ export default function GuidedTour() {
                         className="w-full flex items-center justify-center gap-2.5 rounded-2xl h-14 text-white text-base font-bold shadow-xl tap-scale transition-all bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/20"
                     >
                         <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
-                        {t('tour.unlockPremium', { defaultValue: 'Mở khóa Premium' })}
+                        {t('tour.unlockNow')}
                         {selectedTour.premium_price ? (
                             <span className="text-sm opacity-80">— {selectedTour.premium_price.toLocaleString('vi-VN')}₫</span>
                         ) : null}
