@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { PayPalButtons } from '@paypal/react-paypal-js';
 import { useTranslation } from 'react-i18next';
 import type { Tour } from '../types';
@@ -42,12 +43,12 @@ export default function PremiumTourCheckout({ tour, onClose, onSuccess }: Premiu
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
+    return createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in p-4"
             onClick={onClose}
         >
             <div
-                className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-slide-up"
+                className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl animate-modal-in max-h-[90dvh] overflow-y-auto"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
@@ -198,5 +199,5 @@ export default function PremiumTourCheckout({ tour, onClose, onSuccess }: Premiu
                 )}
             </div>
         </div>
-    );
+    , document.body);
 }

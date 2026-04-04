@@ -124,7 +124,8 @@ export default function PartnerPortal() {
     statusDisplay: '',
   });
   const [deactivating, setDeactivating] = useState(false);
-  const { isPlaying, speakTTS, pause } = useAudioPlayer();
+  const { isPlaying, speakTTS, pause, load, play } = useAudioPlayer();
+  const [introLoading, setIntroLoading] = useState(false);
   const publicBaseUrl = useMemo(() => getPublicBaseUrl(), []);
   const [analyticsData, setAnalyticsData] = useState<PartnerAnalyticsData | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -240,12 +241,33 @@ export default function PartnerPortal() {
     }
   };
 
-  const handleTestIntro = () => {
+  const handleTestIntro = async () => {
     if (isPlaying) {
       pause();
-    } else if (draft.introText) {
-      speakTTS(draft.introText, 'vi-VN');
+      return;
     }
+    if (!draft.introText) return;
+
+    // Nếu có POI liên kết → thử lấy audio thật từ BE
+    if (partnerPoiId) {
+      setIntroLoading(true);
+      try {
+        const { getPOIMedia } = await import('../services/api');
+        const media = await getPOIMedia(partnerPoiId, 'vi', 'mien_nam');
+        if (media?.file_url) {
+          await load(media.file_url);
+          await play();
+          return;
+        }
+      } catch {
+        // không có media → fallback TTS
+      } finally {
+        setIntroLoading(false);
+      }
+    }
+
+    // Fallback: browser TTS
+    speakTTS(draft.introText, 'vi-VN');
   };
 
 
@@ -465,11 +487,26 @@ export default function PartnerPortal() {
           />
           <div className="mt-3 grid grid-cols-1 gap-2">
             <button
-              onClick={handleTestIntro}
-              className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white flex items-center justify-center gap-1"
+              onClick={() => void handleTestIntro()}
+              disabled={introLoading}
+              className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white flex items-center justify-center gap-1 disabled:opacity-60 disabled:pointer-events-none"
             >
-              <span className="material-symbols-outlined text-sm">{isPlaying ? 'stop_circle' : 'play_circle'}</span>
-              {isPlaying ? 'Dừng nghe' : 'Nghe thử intro'}
+              {introLoading ? (
+                <>
+                  <span className="size-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  Đang tải audio...
+                </>
+              ) : isPlaying ? (
+                <>
+                  <span className="material-symbols-outlined text-sm">stop_circle</span>
+                  Dừng nghe
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-sm">play_circle</span>
+                  {partnerPoiId ? 'Nghe thử (audio BE)' : 'Nghe thử (TTS)'}
+                </>
+              )}
             </button>
           </div>
           <div className="mt-3 grid gap-3">
