@@ -36,6 +36,7 @@ interface UseNarrationEngineOptions {
     onNarrationConflict: (newPoi: POI) => void;
 }
 
+
 export function useNarrationEngine({
     language,
     voiceRegion,
@@ -124,9 +125,9 @@ export function useNarrationEngine({
     );
 
     /**
-     * Gọi khi kết thúc phát (audio ended hoặc user bấm Stop)
+     * Gọi khi kết thúc phát (audio ended hoặc user bấm Stop).
      */
-    const finishNarration = useCallback(async (duration: number) => {
+    const finishNarration = useCallback(async (duration: number): Promise<void> => {
         isPlayingRef.current = false;
         currentPoiRef.current = null;
         if (currentLogIdRef.current) {

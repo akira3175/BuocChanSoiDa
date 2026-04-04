@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -122,7 +122,7 @@ function getPOIStatus(index: number, currentIndex: number): POIStatus {
 
 export default function GuidedTour() {
     const { t, i18n } = useTranslation();
-    const { user, openNarration, closeNarration, dispatch } = useApp();
+    const { user, openNarration, closeNarration, dispatch, narrationQueue } = useApp();
     const [tours, setTours] = useState<Tour[]>([]);
     const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
     const [activeTab, setActiveTab] = useState<'overview' | 'route' | 'reviews'>('route');
@@ -203,12 +203,44 @@ export default function GuidedTour() {
         dispatch({ type: 'PUSH_TO_QUEUE', payload: newPoi });
     }, [dispatch]);
 
+    // Ref để tránh stale closure khi gọi triggerNarration từ useEffect
+    const triggerNarrationRef = useRef<((poi: POI, type?: 'AUTO' | 'QR') => void) | null>(null);
+
     const { triggerNarration, finishNarration } = useNarrationEngine({
         language: (localStorage.getItem('bcsd_language') as Language) || user?.preferred_language || 'vi',
         voiceRegion: user?.preferred_voice_region || 'mien_nam',
         onNarrationReady: handleNarrationReady,
         onNarrationConflict: handleNarrationConflict,
     });
+
+    // Cập nhật ref mỗi lần triggerNarration thay đổi
+    triggerNarrationRef.current = triggerNarration;
+
+    // ── Queue Auto-Play ──
+    // Khi narrationData đóng (null) VÀ queue còn POI → tự động phát tiếp
+    useEffect(() => {
+        if (!tourStarted) return;              // Tour chưa bắt đầu → bỏ qua
+        if (narrationData !== null) return;    // Đang phát → chờ
+        if (narrationQueue.length === 0) return; // Queue trống → không làm gì
+
+        const nextPoi = narrationQueue[0];
+        console.log('[Tour] Queue auto-play: dequeue & trigger', nextPoi.name);
+
+        // Delay nhỏ để NarrationBottomSheet unmount hoàn toàn (cleanup audio/TTS)
+        // trước khi trigger narration mới
+        const timer = setTimeout(() => {
+            dispatch({ type: 'REMOVE_FROM_QUEUE' });
+            // Dùng 'QR' để bypass anti-spam vì đây là queue intent
+            triggerNarrationRef.current?.(nextPoi, 'QR');
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [narrationData, narrationQueue, tourStarted, dispatch]);
+
+
+
+
+
 
     // Geofence engine - tự động kích hoạt narration khi đi vào vùng POI
     useGeofence({
@@ -245,9 +277,12 @@ export default function GuidedTour() {
 
     const handleNarrationClose = useCallback(async (duration: number) => {
         await finishNarration(duration);
+        // Đóng UI narration. Nếu queue có POI tiếp theo,
+        // useEffect [narrationData, narrationQueue] sẽ tự kích hoạt sau khi narrationData = null.
         setNarrationData(null);
         closeNarration();
     }, [finishNarration, closeNarration]);
+
 
     const handlePOIPopupOpen = useCallback((poi: POI) => {
         // Unlock NGAY LẬP TỨC từ event click của user
@@ -695,8 +730,9 @@ export default function GuidedTour() {
 
             {/* Narration Bottom Sheet Overlay */}
             {narrationData && (
-                <div key={narrationData.poi.id} className="absolute inset-0 z-30 flex flex-col justify-end bg-black/20 backdrop-blur-sm">
+                <div className="absolute inset-0 z-30 flex flex-col justify-end bg-black/20 backdrop-blur-sm">
                     <NarrationBottomSheet
+                        key={narrationData.poi.id}
                         poi={narrationData.poi}
                         media={narrationData.media}
                         partners={narrationData.partners}

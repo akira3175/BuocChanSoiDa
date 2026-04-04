@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, useMapEvents } from 'react-leaflet';
 import { useLocation, useNavigate } from 'react-router-dom';
 import L from 'leaflet';
@@ -88,7 +88,7 @@ const DEFAULT_CENTER: [number, number] = [10.7552, 106.7038];
 
 export default function MapExplore() {
     const { t } = useTranslation();
-    const { user, openNarration, closeNarration, dispatch } = useApp();
+    const { user, openNarration, closeNarration, dispatch, narrationQueue } = useApp();
     const [pois, setPois] = useState<POI[]>([]);
     const [showQR, setShowQR] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -172,6 +172,28 @@ export default function MapExplore() {
         onNarrationReady: handleNarrationReady,
         onNarrationConflict: handleNarrationConflict,
     });
+
+    // Ref để tránh stale closure khi gọi triggerNarration từ useEffect
+    const triggerNarrationRef = useRef<((poi: POI, type?: 'AUTO' | 'QR') => void) | null>(null);
+    triggerNarrationRef.current = triggerNarration;
+
+    // ── Queue Auto-Play ──
+    // Khi narrationData đóng (null) VÀ queue còn POI → tự động phát tiếp
+    useEffect(() => {
+        if (narrationData !== null) return;      // Đang phát → chờ
+        if (narrationQueue.length === 0) return; // Queue trống
+
+        const nextPoi = narrationQueue[0];
+        console.log('[Map] Queue auto-play:', nextPoi.name);
+
+        const timer = setTimeout(() => {
+            dispatch({ type: 'REMOVE_FROM_QUEUE' });
+            // Dùng 'QR' để bypass anti-spam vì đây là queue intent
+            triggerNarrationRef.current?.(nextPoi, 'QR');
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [narrationData, narrationQueue, dispatch]);
 
     // Khi navigate về /map từ QR scan (QRScanOverlay gọi navigate với state.qrPOI)
     useEffect(() => {
@@ -472,8 +494,9 @@ export default function MapExplore() {
 
             {/* NARRATION BOTTOM SHEET OVERLAY */}
             {narrationData && (
-                <div key={narrationData.poi.id} className="absolute inset-0 z-30 flex flex-col justify-end bg-black/20 backdrop-blur-sm">
+                <div className="absolute inset-0 z-30 flex flex-col justify-end bg-black/20 backdrop-blur-sm">
                     <NarrationBottomSheet
+                        key={narrationData.poi.id}
                         poi={narrationData.poi}
                         media={narrationData.media}
                         partners={narrationData.partners}
