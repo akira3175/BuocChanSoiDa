@@ -3,8 +3,10 @@ from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from payments.models import get_partner_premium_price_vnd
 
 from users.permissions import user_has_partner_portal_access
+from users.permissions import user_has_partner_premium_access
 
 from .models import Partner
 
@@ -253,6 +255,8 @@ class PartnerProfileSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     poi_created_at = serializers.SerializerMethodField()
     poi_updated_at = serializers.SerializerMethodField()
+    is_premium_unlocked = serializers.SerializerMethodField()
+    premium_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Partner
@@ -267,6 +271,8 @@ class PartnerProfileSerializer(serializers.ModelSerializer):
             'poi',
             'status',
             'status_display',
+            'is_premium_unlocked',
+            'premium_price',
             'created_at',
             'updated_at',
             'poi_created_at',
@@ -289,6 +295,16 @@ class PartnerProfileSerializer(serializers.ModelSerializer):
         if obj.poi_id and getattr(obj, 'poi', None):
             return obj.poi.updated_at
         return None
+
+    def get_is_premium_unlocked(self, obj):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        if user and getattr(user, 'id', None) == getattr(obj, 'user_id', None):
+            return user_has_partner_premium_access(user)
+        return False
+
+    def get_premium_price(self, obj):
+        return get_partner_premium_price_vnd()
 
 
 class PartnerChangePasswordSerializer(serializers.Serializer):

@@ -12,4 +12,7 @@ urlpatterns = [
     # Premium Tour
     path('tour-purchase/', views.tour_purchase_create, name='tour-purchase-create'),
     path('tour-purchase/check/', views.tour_purchase_check, name='tour-purchase-check'),
+    # Premium Partner
+    path('partner-premium/', views.partner_premium_purchase_create, name='partner-premium-create'),
+    path('partner-premium/check/', views.partner_premium_purchase_check, name='partner-premium-check'),
 ]

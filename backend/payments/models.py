@@ -4,6 +4,38 @@ from django.conf import settings
 from django.db import models
 
 
+class PaymentConfig(models.Model):
+    """Cấu hình thanh toán chỉnh được từ Django admin."""
+
+    partner_premium_price_vnd = models.PositiveBigIntegerField(
+        'Giá gói Partner Premium (VND)',
+        default=100000,
+        help_text='Giá mở khóa gói premium cho tài khoản partner.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'payment_config'
+        verbose_name = 'Cấu hình thanh toán'
+        verbose_name_plural = 'Cấu hình thanh toán'
+
+    def save(self, *args, **kwargs):
+        # Chỉ giữ một bản ghi cấu hình duy nhất.
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+def get_partner_premium_price_vnd() -> int:
+    """Lấy giá partner premium từ cấu hình trong DB."""
+    return int(PaymentConfig.get_solo().partner_premium_price_vnd or 0)
+
+
 class Invoice(models.Model):
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'Pending'
@@ -75,3 +107,37 @@ class TourPurchase(models.Model):
 
     def __str__(self) -> str:
         return f'{self.user} - {self.tour} ({self.purchased_at})'
+
+
+class PartnerPremiumPurchase(models.Model):
+    """Ghi nhận việc partner mua gói premium để mở khóa chỉnh sửa POI."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='partner_premium_purchases',
+    )
+    invoice = models.OneToOneField(
+        Invoice,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='partner_premium_purchase',
+    )
+    purchased_at = models.DateTimeField('Ngày mua', auto_now_add=True)
+
+    class Meta:
+        db_table = 'partner_premium_purchases'
+        verbose_name = 'Mua Premium Partner'
+        verbose_name_plural = 'Mua Premium Partner'
+        ordering = ['-purchased_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user'],
+                name='uniq_user_partner_premium_purchase',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.user} - Partner Premium ({self.purchased_at})'

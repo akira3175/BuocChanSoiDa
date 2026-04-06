@@ -18,6 +18,7 @@ import type {
     UserLoginPayload,
     PartnerAuthUser,
     UserAuthSession,
+    PartnerPremiumPurchaseResponse,
 } from '../types';
 
 export interface Invoice {
@@ -519,6 +520,19 @@ export const checkTourPurchase = async (tourId: string | number): Promise<{ purc
         '/payments/tour-purchase/check/',
         { params: { tour_id: tourId } }
     );
+    return data;
+};
+
+export const purchasePartnerPremium = async (): Promise<PartnerPremiumPurchaseResponse> => {
+    const { data } = await apiClient.post<PartnerPremiumPurchaseResponse>(
+        '/payments/partner-premium/',
+        {}
+    );
+    return data;
+};
+
+export const checkPartnerPremiumPurchase = async (): Promise<{ purchased: boolean }> => {
+    const { data } = await apiClient.get<{ purchased: boolean }>('/payments/partner-premium/check/');
     return data;
 };
 

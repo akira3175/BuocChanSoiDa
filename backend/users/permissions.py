@@ -18,6 +18,21 @@ def user_has_partner_portal_access(user) -> bool:
     return Partner.objects.filter(user=user).exists()
 
 
+def user_has_partner_premium_access(user) -> bool:
+    """
+    Partner premium access is granted after a successful premium purchase.
+    """
+    if not user or not user.is_authenticated:
+        return False
+
+    from payments.models import PartnerPremiumPurchase
+
+    return PartnerPremiumPurchase.objects.filter(
+        user=user,
+        invoice__status='SUCCESS',
+    ).exists()
+
+
 class IsPartner(BasePermission):
     """
     Cho phép user có quyền cổng Partner (nhóm 'Partner' hoặc hồ sơ Partner đã gắn user).
@@ -25,6 +40,15 @@ class IsPartner(BasePermission):
 
     def has_permission(self, request, view):
         return user_has_partner_portal_access(request.user)
+
+
+class IsPartnerPremium(BasePermission):
+    """
+    Chỉ cho phép Partner đã mở khóa premium.
+    """
+
+    def has_permission(self, request, view):
+        return user_has_partner_premium_access(request.user)
 
 
 class IsPartnerOwner(BasePermission):

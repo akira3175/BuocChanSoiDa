@@ -19,7 +19,7 @@ from .serializers import (
     POIListSerializer,
 )
 from partners.serializers import PartnerSerializer
-from users.permissions import IsPartner
+from users.permissions import IsPartner, IsPartnerPremium
 
 # Bán kính tìm kiếm mặc định (mét)
 DEFAULT_RADIUS_M = 1000
@@ -196,7 +196,7 @@ class PartnerMyPOIView(APIView):
     CRUD POI cho tài khoản Partner.
     Mỗi tài khoản Partner chỉ được sở hữu tối đa 1 POI.
     """
-    permission_classes = [IsAuthenticated, IsPartner]
+    permission_classes = [IsAuthenticated, IsPartnerPremium]
 
     def get(self, request):
         # Ưu tiên theo quan hệ link từ Partner -> POI (admin có thể gán nhiều partner vào 1 POI).
@@ -354,7 +354,7 @@ class POICoverImageView(APIView):
     Chấp nhận multipart/form-data với field 'image'.
     Response: { cover_image_url: <url> }
     """
-    permission_classes = [IsAuthenticated, IsPartner]
+    permission_classes = [IsAuthenticated, IsPartnerPremium]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -424,7 +424,7 @@ class POIMapQrUrlView(APIView):
     Trả về đường dẫn /map?poi=&qr= kèm chữ ký có thời hạn 1 giờ (in mã QR đặt tại quán).
     """
 
-    permission_classes = [IsAuthenticated, IsPartner]
+    permission_classes = [IsAuthenticated, IsPartnerPremium]
 
     def get(self, request):
         partner = Partner.objects.select_related('poi').filter(user=request.user).first()

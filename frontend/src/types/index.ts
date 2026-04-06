@@ -78,11 +78,20 @@ export interface Partner {
     status?: number;
     /** Nhãn trạng thái từ backend (vd. Chờ phê duyệt) */
     status_display?: string;
+    is_premium_unlocked?: boolean;
+    premium_price?: number;
     created_at?: string;
     updated_at?: string;
     poi_created_at?: string | null;
     poi_updated_at?: string | null;
     poi?: number | string | null;
+}
+
+export interface PartnerPremiumPurchaseResponse {
+    invoice_id: string;
+    partner_premium_purchase_id: string;
+    amount: number;
+    partner_name: string;
 }
 
 export interface Tour {

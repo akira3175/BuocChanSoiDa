@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
+import PartnerPremiumCheckout from '../components/PartnerPremiumCheckout';
 import {
   deactivatePartnerAccount,
   getApiErrorMessage,
@@ -61,6 +62,8 @@ interface DistributionInfo {
   poiCreatedAt: string | null;
   poiUpdatedAt: string | null;
   statusDisplay: string;
+  premiumUnlocked: boolean;
+  premiumPrice: number;
 }
 
 function getPublicBaseUrl(): string {
@@ -122,8 +125,11 @@ export default function PartnerPortal() {
     poiCreatedAt: null,
     poiUpdatedAt: null,
     statusDisplay: '',
+    premiumUnlocked: false,
+    premiumPrice: 0,
   });
   const [deactivating, setDeactivating] = useState(false);
+  const [showPremiumCheckout, setShowPremiumCheckout] = useState(false);
   const { isPlaying, speakTTS, pause, load, play } = useAudioPlayer();
   const [introLoading, setIntroLoading] = useState(false);
   const publicBaseUrl = useMemo(() => getPublicBaseUrl(), []);
@@ -135,6 +141,11 @@ export default function PartnerPortal() {
     if (!partnerPoiId) return '';
     return buildScanQrUrl(publicBaseUrl, partnerPoiId);
   }, [partnerPoiId, publicBaseUrl]);
+
+  const handlePremiumSuccess = () => {
+    setShowPremiumCheckout(false);
+    window.location.reload();
+  };
 
 
   const handleFieldChange = (key: keyof PartnerDraft, value: string) => {
@@ -180,6 +191,8 @@ export default function PartnerPortal() {
           poiCreatedAt: data.poi_created_at ?? null,
           poiUpdatedAt: data.poi_updated_at ?? null,
           statusDisplay: data.status_display?.trim() ?? '',
+          premiumUnlocked: Boolean(data.is_premium_unlocked),
+          premiumPrice: Number(data.premium_price ?? 0),
         });
         if (typeof data.status === 'number') {
           const nextApprovalStatus: ApprovalStatus =
@@ -228,6 +241,8 @@ export default function PartnerPortal() {
         poiCreatedAt: p.poi_created_at ?? null,
         poiUpdatedAt: p.poi_updated_at ?? null,
         statusDisplay: p.status_display?.trim() ?? '',
+        premiumUnlocked: Boolean(p.is_premium_unlocked),
+        premiumPrice: Number(p.premium_price ?? 0),
       });
       setPartnerPoiId(p.poi ? String(p.poi) : '');
       if (typeof p.status === 'number') {
@@ -316,6 +331,8 @@ export default function PartnerPortal() {
           poiCreatedAt: data.poi_created_at ?? null,
           poiUpdatedAt: data.poi_updated_at ?? null,
           statusDisplay: data.status_display?.trim() ?? '',
+          premiumUnlocked: Boolean(data.is_premium_unlocked),
+          premiumPrice: Number(data.premium_price ?? 0),
         });
         setDraft((prev) => ({
           ...prev,
@@ -360,6 +377,8 @@ export default function PartnerPortal() {
           poiCreatedAt: data.poi_created_at ?? null,
           poiUpdatedAt: data.poi_updated_at ?? null,
           statusDisplay: data.status_display?.trim() ?? '',
+          premiumUnlocked: Boolean(data.is_premium_unlocked),
+          premiumPrice: Number(data.premium_price ?? 0),
         });
         if (typeof data.status === 'number') {
           const nextApprovalStatus: ApprovalStatus =
@@ -927,7 +946,47 @@ export default function PartnerPortal() {
         </section>
 
         {activeTab === 'profile' && renderProfileTab()}
-        {activeTab === 'poi' && <PartnerPOI />}
+        {activeTab === 'poi' && (
+          distributionInfo.premiumUnlocked ? (
+            <PartnerPOI />
+          ) : (
+            <section className="mx-4 mt-4 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-4 shadow-sm animate-stagger-item">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md shadow-amber-500/20">
+                  <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    workspace_premium
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">Premium Partner</p>
+                  <h3 className="mt-0.5 text-base font-bold leading-tight text-slate-900">Mở khóa tab POI</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                    Nâng cấp để chỉnh sửa POI đã liên kết, cập nhật ảnh bìa và QR map cho đối tác của bạn.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-white/80 bg-white/80 p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-slate-500">Phí mở khóa</p>
+                  <p className="text-xl font-black text-slate-900">{(distributionInfo.premiumPrice || 0).toLocaleString('vi-VN')}₫</p>
+                </div>
+                <ul className="mt-3 space-y-1.5 text-xs text-slate-600">
+                  <li className="flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px] text-emerald-500">check_circle</span> Chỉnh sửa POI trong Partner Portal</li>
+                  <li className="flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px] text-emerald-500">check_circle</span> Tự động đồng bộ POI sau thanh toán</li>
+                  <li className="flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px] text-emerald-500">check_circle</span> Giữ nguyên toàn bộ hồ sơ Partner hiện tại</li>
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => setShowPremiumCheckout(true)}
+                  className="mt-4 w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-amber-500/20 transition hover:brightness-105"
+                >
+                  Mở khóa ngay
+                </button>
+              </div>
+            </section>
+          )
+        )}
         {activeTab === 'distribution' && renderDistributionTab()}
         {activeTab === 'analytics' && renderAnalyticsTab()}
 
@@ -942,6 +1001,13 @@ export default function PartnerPortal() {
           {savedAt && <p className="mt-2 text-center text-[11px] font-medium text-emerald-600">Đã lưu lúc {savedAt}</p>}
         </section>
       </div>
+      {showPremiumCheckout && (
+        <PartnerPremiumCheckout
+          amount={distributionInfo.premiumPrice || 0}
+          onClose={() => setShowPremiumCheckout(false)}
+          onSuccess={handlePremiumSuccess}
+        />
+      )}
     </AppLayout>
   );
 }
