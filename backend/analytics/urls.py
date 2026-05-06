@@ -28,4 +28,11 @@ urlpatterns = [
         views.NarrationHistoryView.as_view(),
         name='narration-history',
     ),
+    
+    # Heatmap
+    path(
+        'heatmap/',
+        views.HeatmapDataView.as_view(),
+        name='heatmap-data',
+    ),
 ]

@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db.models import Count
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -184,3 +185,35 @@ class NarrationHistoryView(generics.ListAPIView):
             qs = qs.filter(trigger_type=trigger_type.upper())
 
         return qs
+
+class HeatmapDataView(APIView):
+    """
+    GET /api/analytics/heatmap/
+    Trả về dữ liệu bản đồ nhiệt [lat, lng, weight].
+    BreadcrumbLog weight = 1 (10,000 điểm gần nhất).
+    NarrationLog weight = 10 * số lần tương tác.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        points = []
+
+        # 1. Điểm lưu vết di chuyển (giới hạn 10,000 để tránh lag)
+        breadcrumbs = BreadcrumbLog.objects.filter(
+            status=BreadcrumbLog.Status.ACTIVE
+        ).order_by('-timestamp')[:10000]
+        
+        for b in breadcrumbs:
+            points.append([b.lat, b.long, 1.0])
+
+        # 2. Điểm tương tác POI (tính độ nổi tiếng)
+        narration_counts = NarrationLog.objects.filter(
+            status=NarrationLog.Status.ACTIVE
+        ).values('poi__latitude', 'poi__longitude').annotate(total_listens=Count('id'))
+
+        for item in narration_counts:
+            # Mỗi lượt nghe tính trọng số = 10
+            weight = item['total_listens'] * 10.0
+            points.append([item['poi__latitude'], item['poi__longitude'], weight])
+
+        return Response(points)
