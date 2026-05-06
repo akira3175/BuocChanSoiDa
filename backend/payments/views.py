@@ -15,10 +15,14 @@ from .serializers import InvoiceCreateSerializer, InvoiceSerializer
 
 
 class InvoiceListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        return Invoice.objects.all().order_by('-created_at')
+        qs = Invoice.objects.filter(user=self.request.user).order_by('-created_at')
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter.upper())
+        return qs
     
     def get_serializer_class(self):
         if self.request.method == 'POST':

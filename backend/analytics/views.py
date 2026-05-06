@@ -217,3 +217,46 @@ class HeatmapDataView(APIView):
             points.append([item['poi__latitude'], item['poi__longitude'], weight])
 
         return Response(points)
+
+
+class BreadcrumbHistoryView(generics.ListAPIView):
+    """
+    GET /api/analytics/breadcrumbs/history/
+
+    Trả về lịch sử điểm GPS của user hiện tại.
+    - Nếu đã đăng nhập: trả về breadcrumbs của user đó.
+    - Nếu chưa đăng nhập: trả về danh sách rỗng (không báo lỗi).
+
+    Query params:
+      - limit  (int, default 500): số lượng điểm tối đa
+      - since  (ISO 8601, optional): chỉ lấy điểm sau thời điểm này
+    """
+    serializer_class = BreadcrumbLogReadSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return BreadcrumbLog.objects.none()
+
+        qs = BreadcrumbLog.objects.filter(
+            user=self.request.user,
+            status=BreadcrumbLog.Status.ACTIVE,
+        ).order_by('timestamp')
+
+        since = self.request.query_params.get('since')
+        if since:
+            try:
+                from django.utils.dateparse import parse_datetime
+                dt = parse_datetime(since)
+                if dt:
+                    qs = qs.filter(timestamp__gte=dt)
+            except Exception:
+                pass
+
+        limit = self.request.query_params.get('limit', 500)
+        try:
+            limit = max(1, min(int(limit), 2000))
+        except (ValueError, TypeError):
+            limit = 500
+
+        return qs[:limit]

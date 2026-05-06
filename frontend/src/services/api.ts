@@ -477,8 +477,10 @@ export const getInvoiceById = async (invoiceId: string): Promise<Invoice> => {
     return data;
 };
 
-export const getInvoices = async (): Promise<Invoice[]> => {
-    const { data } = await apiClient.get<Invoice[]>('/payments/invoices/');
+export const getInvoices = async (statusFilter?: string): Promise<Invoice[]> => {
+    const params: Record<string, string> = {};
+    if (statusFilter) params.status = statusFilter;
+    const { data } = await apiClient.get<Invoice[]>('/payments/invoices/', { params });
     return data;
 };
 
@@ -732,6 +734,32 @@ export const postBreadcrumbs = async (points: BreadcrumbPoint[]): Promise<void> 
 // --- Offline data endpoint ---
 export const downloadOfflinePackage = async (tourId: string): Promise<Blob> => {
     const { data } = await apiClient.get<Blob>(`/offline/package/${tourId}/`, { responseType: 'blob' });
+    return data;
+};
+
+export interface BreadcrumbHistoryPoint {
+    id: number;
+    lat: number;
+    long: number;
+    timestamp: string;
+    status: number;
+}
+
+/**
+ * GET /api/analytics/breadcrumbs/history/
+ * Lấy lịch sử điểm GPS của user hiện tại.
+ * Yêu cầu đăng nhập.
+ */
+export const getBreadcrumbHistory = async (
+    limit = 500,
+    since?: string,
+): Promise<BreadcrumbHistoryPoint[]> => {
+    const params: Record<string, string | number> = { limit };
+    if (since) params.since = since;
+    const { data } = await apiClient.get<BreadcrumbHistoryPoint[]>(
+        '/analytics/breadcrumbs/history/',
+        { params },
+    );
     return data;
 };
 

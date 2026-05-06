@@ -11,6 +11,11 @@ urlpatterns = [
         views.BreadcrumbBatchCreateView.as_view(),
         name='breadcrumb-batch-create',
     ),
+    path(
+        'breadcrumbs/history/',
+        views.BreadcrumbHistoryView.as_view(),
+        name='breadcrumb-history',
+    ),
 
     # NarrationLog
     path(

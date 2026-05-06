@@ -22,6 +22,7 @@ const PartnerSignup = lazy(() => import('./pages/PartnerSignup'));
 const DemoQR = lazy(() => import('./pages/DemoQR'));
 const InvoiceDetail = lazy(() => import('./pages/InvoiceDetail'));
 const HeatmapAnalytics = lazy(() => import('./pages/HeatmapAnalytics'));
+const MovementLog = lazy(() => import('./pages/MovementLog'));
 
 function LazyFallback() {
   const { t } = useTranslation();
@@ -58,6 +59,7 @@ export default function App() {
                   <Route path="/offline" element={<OfflineDownload />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/invoice" element={<InvoiceDetail />} />
+                  <Route path="/movement-log" element={<MovementLog />} />
                   <Route path="/partner/login" element={<PartnerLogin />} />
                   <Route path="/partner/signup" element={<PartnerSignup />} />
                   <Route path="/partner" element={<RequirePartnerAuth><PartnerPortal /></RequirePartnerAuth>} />

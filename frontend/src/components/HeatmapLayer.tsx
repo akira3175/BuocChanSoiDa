@@ -1,56 +1,56 @@
 import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet.heat';
 
 interface HeatmapLayerProps {
-  points: [number, number, number][]; // [lat, lng, weight]
-  radius?: number;
-  blur?: number;
-  maxZoom?: number;
+    points: [number, number, number][]; // [lat, lng, weight]
+    radius?: number;
+    blur?: number;
+    maxZoom?: number;
 }
 
 export default function HeatmapLayer({ points, radius = 25, blur = 15, maxZoom = 17 }: HeatmapLayerProps) {
-  const map = useMap();
-  const heatLayerRef = useRef<any>(null);
+    const map = useMap();
+    const heatLayerRef = useRef<L.HeatLayer | null>(null);
 
-  useEffect(() => {
-    if (!map) return;
-    
-    // Ensure window.L and window.L.heatLayer are ready 
-    const L = (window as any).L;
-    if (!L || !L.heatLayer) {
-        console.warn("leaflet.heat is not ready yet");
-        return;
-    }
+    useEffect(() => {
+        if (!map || points.length === 0) return;
 
-    if (heatLayerRef.current) {
-        map.removeLayer(heatLayerRef.current);
-    }
+        // Xóa layer cũ nếu có
+        if (heatLayerRef.current) {
+            map.removeLayer(heatLayerRef.current);
+            heatLayerRef.current = null;
+        }
 
-    const maxWeight = points.length > 0 ? Math.max(...points.map(p => p[2])) : 1.0;
-    
-    // Use leaflet.heat initialized from CDN
-    heatLayerRef.current = L.heatLayer(points, {
-      radius: radius,
-      blur: blur,
-      maxZoom: maxZoom,
-      max: maxWeight, // Dynamic point intensity
-      gradient: {
-        0.4: 'blue',
-        0.6: 'cyan',
-        0.7: 'lime',
-        0.8: 'yellow',
-        1.0: 'red'
-      }
-    });
+        const maxWeight = Math.max(...points.map(p => p[2]), 1);
 
-    heatLayerRef.current.addTo(map);
+        // Sử dụng L.heatLayer từ npm package leaflet.heat (không phải window.L)
+        heatLayerRef.current = L.heatLayer(points, {
+            radius,
+            blur,
+            maxZoom,
+            max: maxWeight,
+            minOpacity: 0.4,
+            gradient: {
+                0.2: '#3b82f6',   // blue
+                0.4: '#06b6d4',   // cyan
+                0.6: '#22c55e',   // green
+                0.75: '#eab308',  // yellow
+                0.9: '#f97316',   // orange
+                1.0: '#ef4444',   // red
+            },
+        });
 
-    return () => {
-      if (heatLayerRef.current && map) {
-        map.removeLayer(heatLayerRef.current);
-      }
-    };
-  }, [points, radius, blur, maxZoom, map]);
+        heatLayerRef.current.addTo(map);
 
-  return null;
+        return () => {
+            if (heatLayerRef.current && map) {
+                map.removeLayer(heatLayerRef.current);
+                heatLayerRef.current = null;
+            }
+        };
+    }, [points, radius, blur, maxZoom, map]);
+
+    return null;
 }
