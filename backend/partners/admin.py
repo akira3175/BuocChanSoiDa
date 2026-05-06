@@ -1,13 +1,14 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import Partner
+from users.permissions import user_has_partner_premium_access
 
 
 @admin.register(Partner)
 class PartnerAdmin(admin.ModelAdmin):
     list_display = [
         'id', 'business_name', 'address', 'user', 'poi', 'poi_timestamps',
-        'opening_hours', 'has_intro_tts', 'status_badge',
+        'opening_hours', 'has_intro_tts', 'status_badge', 'premium_badge',
     ]
     list_filter = ['status', 'poi', 'user']
     search_fields = ['business_name', 'address', 'poi__name', 'user__email', 'user__username']
@@ -105,6 +106,16 @@ class PartnerAdmin(admin.ModelAdmin):
         )
     status_badge.short_description = 'Trạng thái'
     status_badge.admin_order_field = 'status'
+
+    def premium_badge(self, obj):
+        if obj.user_id and user_has_partner_premium_access(obj.user):
+            return format_html(
+                '<span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">💎 Premium</span>'
+            )
+        return format_html(
+            '<span style="color:#94a3b8;font-size:11px">Chưa mở khóa</span>'
+        )
+    premium_badge.short_description = 'Gói'
 
     @admin.action(description='⏳ Đánh dấu chờ phê duyệt')
     def mark_pending_approval(self, request, queryset):

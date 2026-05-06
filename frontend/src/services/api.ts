@@ -18,6 +18,7 @@ import type {
     UserLoginPayload,
     PartnerAuthUser,
     UserAuthSession,
+    PartnerPremiumPurchaseResponse,
 } from '../types';
 
 export interface Invoice {
@@ -522,6 +523,19 @@ export const checkTourPurchase = async (tourId: string | number): Promise<{ purc
     return data;
 };
 
+export const purchasePartnerPremium = async (): Promise<PartnerPremiumPurchaseResponse> => {
+    const { data } = await apiClient.post<PartnerPremiumPurchaseResponse>(
+        '/payments/partner-premium/',
+        {}
+    );
+    return data;
+};
+
+export const checkPartnerPremiumPurchase = async (): Promise<{ purchased: boolean }> => {
+    const { data } = await apiClient.get<{ purchased: boolean }>('/payments/partner-premium/check/');
+    return data;
+};
+
 // --- POI endpoints ---
 export const getPOIsNearMe = async (lat: number, lng: number, language = 'vi', voiceRegion = 'mien_nam', radius = 500): Promise<POI[]> => {
     const { data } = await apiClient.get<POI[]>('/pois/near-me/', { params: { lat, lng, radius, language, voice_region: voiceRegion } });
@@ -535,6 +549,26 @@ export const getPOIById = async (id: string): Promise<POI> => {
 
 export const scanQRCode = async (code: string): Promise<POI> => {
     const { data } = await apiClient.get<POI>('/pois/scan/', { params: { code } });
+    return data;
+};
+
+export interface PartnerMapQrUrlResponse {
+    map_path: string;
+    expires_in_seconds: number;
+    expires_at: string;
+}
+
+/** Signed /map?poi=&qr= URL for printed venue QR (valid 1 hour). Requires partner auth. */
+export const getPartnerMapQrUrl = async (): Promise<PartnerMapQrUrlResponse> => {
+    const { data } = await apiClient.get<PartnerMapQrUrlResponse>('/pois/my-poi/qr-map-url/');
+    return data;
+};
+
+/** Resolve POI from signed map QR token (same response shape as getPOIById). */
+export const resolveMapQrPoi = async (poiId: string, qrToken: string): Promise<POI> => {
+    const { data } = await apiClient.get<POI>('/pois/map-qr/resolve/', {
+        params: { poi: poiId, qr: qrToken },
+    });
     return data;
 };
 

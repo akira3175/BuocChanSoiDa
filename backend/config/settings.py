@@ -238,6 +238,8 @@ PAYPAL_CLIENT_ID = os.getenv('PAYPAL_CLIENT_ID', '')
 PAYPAL_SECRET = os.getenv('PAYPAL_SECRET', '')
 PAYPAL_BASE = os.getenv('PAYPAL_BASE', 'https://api-m.sandbox.paypal.com')
 
+# Partner premium price is managed in Django Admin (payments.PaymentConfig).
+
 # Reverse proxy (Caddy/nginx) terminating HTTPS — set BEHIND_HTTPS_PROXY=true in production
 if os.getenv('BEHIND_HTTPS_PROXY', '').lower() in ('1', 'true', 'yes'):
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

@@ -8,7 +8,8 @@ from rest_framework import generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Invoice, TourPurchase
+from .models import Invoice, PartnerPremiumPurchase, TourPurchase
+from .models import get_partner_premium_price_vnd
 from .paypal import ensure_usd_payload, paypal_request
 from .serializers import InvoiceCreateSerializer, InvoiceSerializer
 
@@ -46,6 +47,22 @@ class InvoiceDetailView(generics.RetrieveAPIView):
     queryset = Invoice.objects.all()
     serializer_class = InvoiceSerializer
     permission_classes = [permissions.AllowAny]
+
+
+def _sync_partner_premium_entitlement(invoice: Invoice) -> None:
+    purchase = getattr(invoice, 'partner_premium_purchase', None)
+    if not purchase or invoice.status != Invoice.Status.SUCCESS:
+        return
+
+    try:
+        from pois.models import Partner
+
+        partner = Partner.objects.select_related('poi').filter(user=purchase.user).first()
+        if partner and partner.poi_id:
+            partner.poi.save(update_fields=['updated_at'])
+    except Exception:
+        # Entitlement should not fail the payment flow if POI sync has issues.
+        return
 
 
 @api_view(['POST'])
@@ -122,6 +139,7 @@ def paypal_capture_order(request, order_id: str):
             invoice.paid_at = timezone.now()
             invoice.transaction_code = order_id
             invoice.save(update_fields=['status', 'paid_at', 'transaction_code'])
+            _sync_partner_premium_entitlement(invoice)
         else:
             invoice.status = Invoice.Status.FAILED
             invoice.transaction_code = order_id
@@ -232,4 +250,80 @@ def tour_purchase_check(request):
         invoice__status='SUCCESS',
     ).exists()
 
+    return Response({'purchased': purchased})
+
+
+# ── Premium Partner Purchase ──────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def partner_premium_purchase_create(request):
+    """
+    POST /api/payments/partner-premium/
+    Tạo Invoice + PartnerPremiumPurchase (PENDING) cho tài khoản partner.
+    """
+    from pois.models import Partner
+
+    partner = Partner.objects.filter(user=request.user).first()
+    if not partner:
+        return Response({'error': 'Bạn chưa có hồ sơ partner.'}, status=400)
+
+    amount = get_partner_premium_price_vnd()
+    if amount <= 0:
+        return Response({'error': 'Giá premium partner chưa được cấu hình.'}, status=400)
+
+    existing = PartnerPremiumPurchase.objects.filter(user=request.user).select_related('invoice').first()
+    if existing and existing.invoice and existing.invoice.status == Invoice.Status.SUCCESS:
+        return Response({'error': 'Bạn đã mở khóa premium partner rồi.', 'already_purchased': True}, status=400)
+
+    reason = f'Mua gói premium partner: {partner.business_name}'
+
+    if existing and existing.invoice and existing.invoice.status == Invoice.Status.PENDING:
+        if existing.invoice.amount != amount:
+            existing.invoice.amount = amount
+            existing.invoice.reason = reason
+            existing.invoice.transaction_code = ''
+            existing.invoice.save(update_fields=['amount', 'reason', 'transaction_code'])
+        return Response({
+            'invoice_id': str(existing.invoice.id),
+            'partner_premium_purchase_id': str(existing.id),
+            'amount': existing.invoice.amount,
+            'partner_name': partner.business_name,
+        }, status=200)
+
+    invoice = Invoice.objects.create(
+        user=request.user,
+        reason=reason,
+        amount=amount,
+    )
+
+    if existing:
+        existing.invoice = invoice
+        existing.save(update_fields=['invoice'])
+        purchase = existing
+    else:
+        purchase = PartnerPremiumPurchase.objects.create(
+            user=request.user,
+            invoice=invoice,
+        )
+
+    return Response({
+        'invoice_id': str(invoice.id),
+        'partner_premium_purchase_id': str(purchase.id),
+        'amount': invoice.amount,
+        'partner_name': partner.business_name,
+    }, status=201)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def partner_premium_purchase_check(request):
+    """
+    GET /api/payments/partner-premium/check/
+    Kiểm tra partner đã mua premium chưa.
+    """
+    purchased = PartnerPremiumPurchase.objects.filter(
+        user=request.user,
+        invoice__status=Invoice.Status.SUCCESS,
+    ).exists()
     return Response({'purchased': purchased})
