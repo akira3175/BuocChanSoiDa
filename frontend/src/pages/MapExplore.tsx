@@ -225,7 +225,17 @@ export default function MapExplore() {
                 triggerNarration(poi, 'QR');
                 navigate('/map', { replace: true, state: location.state });
             })
-            .catch(console.error);
+            .catch((err) => {
+                console.error('[Map URL] QR Resolve failed:', err);
+                const status = err.response?.status;
+                let msg = t('qr.invalidCode') || 'Mã QR không hợp lệ.';
+                if (status === 410) {
+                    msg = t('qr.expired') || 'Mã QR này đã hết hạn. Vui lòng quét mã mới tại quầy.';
+                }
+                alert(msg);
+                // Clear the URL params on failure to avoid repeating the error
+                navigate('/map', { replace: true });
+            });
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.search]);
 

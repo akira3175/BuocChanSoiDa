@@ -160,6 +160,8 @@ apiClient.interceptors.request.use((config) => {
     const isPartnerRoute = 
         url.includes('/partners/') || 
         url.includes('/pois/my-poi') || 
+        url.includes('/payments/') ||
+        url.includes('/translate-all/') ||
         (url.includes('/media') && config.method?.toLowerCase() !== 'get');
         
     if (isPartnerRoute) {
@@ -199,6 +201,8 @@ apiClient.interceptors.response.use(
         const isPartnerRoute = 
             url.includes('/partners/') || 
             url.includes('/pois/my-poi') || 
+            url.includes('/payments/') ||
+            url.includes('/translate-all/') ||
             (url.includes('/media') && originalRequest.method?.toLowerCase() !== 'get');
 
         // Avoid refresh loop for login/refresh/logout/guest endpoints

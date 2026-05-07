@@ -1,13 +1,13 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Invoice, PartnerPremiumPurchase, PaymentConfig, TourPurchase
+from .models import AiTtsPurchase, AiTranslatePurchase, Invoice, PartnerPremiumPurchase, PaymentConfig, TourPurchase
 
 
 @admin.register(PaymentConfig)
 class PaymentConfigAdmin(admin.ModelAdmin):
-    list_display = ('partner_premium_price_display', 'updated_at')
-    fields = ('partner_premium_price_vnd',)
+    list_display = ('partner_premium_price_display', 'ai_tts_price_display', 'ai_tts_quota_per_purchase', 'ai_translate_price_display', 'ai_translate_quota_per_purchase', 'updated_at')
+    fields = ('partner_premium_price_vnd', 'ai_tts_price_vnd', 'ai_tts_quota_per_purchase', 'ai_translate_price_vnd', 'ai_translate_quota_per_purchase')
 
     def has_add_permission(self, request):
         return not PaymentConfig.objects.exists()
@@ -19,6 +19,16 @@ class PaymentConfigAdmin(admin.ModelAdmin):
         amount_str = f"{obj.partner_premium_price_vnd:,}".replace(',', '.')
         return format_html('<span style="font-weight:700">{}₫</span>', amount_str)
     partner_premium_price_display.short_description = 'Giá Partner Premium'
+
+    def ai_tts_price_display(self, obj):
+        amount_str = f"{obj.ai_tts_price_vnd:,}".replace(',', '.')
+        return format_html('<span style="font-weight:700;color:#6f42c1">🤖 {}₫</span>', amount_str)
+    ai_tts_price_display.short_description = 'Phí AI TTS'
+
+    def ai_translate_price_display(self, obj):
+        amount_str = f"{obj.ai_translate_price_vnd:,}".replace(',', '.')
+        return format_html('<span style="font-weight:700;color:#198754">🌐 {}₫</span>', amount_str)
+    ai_translate_price_display.short_description = 'Phí AI Dịch'
 
 
 @admin.register(Invoice)
@@ -79,6 +89,44 @@ class TourPurchaseAdmin(admin.ModelAdmin):
 class PartnerPremiumPurchaseAdmin(admin.ModelAdmin):
     list_display = ('id_short', 'user', 'invoice_status', 'purchased_at')
     search_fields = ('user__email', 'user__username', 'invoice__transaction_code')
+    readonly_fields = ('id', 'purchased_at')
+    raw_id_fields = ('user', 'invoice')
+    list_per_page = 30
+
+    def id_short(self, obj):
+        return str(obj.id)[:8] + '…'
+    id_short.short_description = 'ID'
+
+    def invoice_status(self, obj):
+        if obj.invoice:
+            return obj.invoice.get_status_display()
+        return '—'
+    invoice_status.short_description = 'Thanh toán'
+
+
+@admin.register(AiTtsPurchase)
+class AiTtsPurchaseAdmin(admin.ModelAdmin):
+    list_display = ('id_short', 'user', 'invoice_status', 'purchased_at')
+    search_fields = ('user__email', 'user__username')
+    readonly_fields = ('id', 'purchased_at')
+    raw_id_fields = ('user', 'invoice')
+    list_per_page = 30
+
+    def id_short(self, obj):
+        return str(obj.id)[:8] + '…'
+    id_short.short_description = 'ID'
+
+    def invoice_status(self, obj):
+        if obj.invoice:
+            return obj.invoice.get_status_display()
+        return '—'
+    invoice_status.short_description = 'Thanh toán'
+
+
+@admin.register(AiTranslatePurchase)
+class AiTranslatePurchaseAdmin(admin.ModelAdmin):
+    list_display = ('id_short', 'user', 'invoice_status', 'purchased_at')
+    search_fields = ('user__email', 'user__username')
     readonly_fields = ('id', 'purchased_at')
     raw_id_fields = ('user', 'invoice')
     list_per_page = 30

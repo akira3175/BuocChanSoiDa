@@ -8,8 +8,8 @@ from rest_framework import generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from .models import Invoice, PartnerPremiumPurchase, TourPurchase
-from .models import get_partner_premium_price_vnd
+from .models import Invoice, AiTtsPurchase, AiTranslatePurchase, PartnerPremiumPurchase, TourPurchase
+from .models import get_partner_premium_price_vnd, get_ai_tts_price_vnd, get_ai_translate_price_vnd
 from .paypal import ensure_usd_payload, paypal_request
 from .serializers import InvoiceCreateSerializer, InvoiceSerializer
 
@@ -66,6 +66,26 @@ def _sync_partner_premium_entitlement(invoice: Invoice) -> None:
             partner.poi.save(update_fields=['updated_at'])
     except Exception:
         # Entitlement should not fail the payment flow if POI sync has issues.
+        return
+
+
+def _sync_ai_tts_entitlement(invoice: Invoice) -> None:
+    purchases = invoice.ai_tts_purchases.all()
+    if not purchases.exists() or invoice.status != Invoice.Status.SUCCESS:
+        return
+
+    try:
+        from pois.models import Partner
+        from payments.models import get_ai_tts_quota_per_purchase
+
+        quota_to_add = get_ai_tts_quota_per_purchase()
+        for purchase in purchases:
+            partner = Partner.objects.filter(user=purchase.user).first()
+            if partner:
+                partner.ai_tts_quota += quota_to_add
+                partner.save(update_fields=['ai_tts_quota'])
+    except Exception:
+        # Entitlement should not fail the payment flow
         return
 
 
@@ -144,6 +164,8 @@ def paypal_capture_order(request, order_id: str):
             invoice.transaction_code = order_id
             invoice.save(update_fields=['status', 'paid_at', 'transaction_code'])
             _sync_partner_premium_entitlement(invoice)
+            _sync_ai_tts_entitlement(invoice)
+            _sync_ai_translate_entitlement(invoice)
         else:
             invoice.status = Invoice.Status.FAILED
             invoice.transaction_code = order_id
@@ -331,3 +353,189 @@ def partner_premium_purchase_check(request):
         invoice__status=Invoice.Status.SUCCESS,
     ).exists()
     return Response({'purchased': purchased})
+
+
+# ── AI TTS Purchase ───────────────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def ai_tts_purchase_create(request):
+    """
+    POST /api/payments/ai-tts/
+    Tạo Invoice + AiTtsPurchase (PENDING) để Partner mua quyền dùng AI TTS.
+    """
+    from pois.models import Partner
+
+    partner = Partner.objects.filter(user=request.user).first()
+    if not partner:
+        return Response({'error': 'Bạn chưa có hồ sơ partner.'}, status=400)
+
+    amount = get_ai_tts_price_vnd()
+    if amount <= 0:
+        return Response({'error': 'Phí AI TTS chưa được cấu hình.'}, status=400)
+
+    from payments.models import get_ai_tts_quota_per_purchase
+    quota = get_ai_tts_quota_per_purchase()
+    reason = f'Mua {quota} lượt AI TTS: {partner.business_name}'
+
+    # Tìm giao dịch PENDING nếu có để tái sử dụng
+    existing = AiTtsPurchase.objects.filter(
+        user=request.user,
+        invoice__status=Invoice.Status.PENDING
+    ).select_related('invoice').first()
+
+    if existing and existing.invoice:
+        if existing.invoice.amount != amount:
+            existing.invoice.amount = amount
+            existing.invoice.reason = reason
+            existing.invoice.transaction_code = ''
+            existing.invoice.save(update_fields=['amount', 'reason', 'transaction_code'])
+        return Response({
+            'invoice_id': str(existing.invoice.id),
+            'ai_tts_purchase_id': str(existing.id),
+            'amount': existing.invoice.amount,
+            'partner_name': partner.business_name,
+        }, status=200)
+
+    # Nếu không có PENDING, tạo mới hoàn toàn
+    invoice = Invoice.objects.create(
+        user=request.user,
+        reason=reason,
+        amount=amount,
+    )
+
+    purchase = AiTtsPurchase.objects.create(
+        user=request.user,
+        invoice=invoice,
+    )
+
+    return Response({
+        'invoice_id': str(invoice.id),
+        'ai_tts_purchase_id': str(purchase.id),
+        'amount': invoice.amount,
+        'partner_name': partner.business_name,
+    }, status=201)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def ai_tts_purchase_check(request):
+    """
+    GET /api/payments/ai-tts/check/
+    Trả về số lượt AI TTS còn lại (quota), giá và số lượt mua mỗi lần.
+    """
+    from pois.models import Partner
+    from payments.models import get_ai_tts_quota_per_purchase
+
+    partner = Partner.objects.filter(user=request.user).first()
+    quota = partner.ai_tts_quota if partner else 0
+    price = get_ai_tts_price_vnd()
+    quota_per_purchase = get_ai_tts_quota_per_purchase()
+
+    return Response({
+        'quota': quota,
+        'price': price,
+        'quota_per_purchase': quota_per_purchase,
+    })
+
+
+# ── AI Translate Purchase ─────────────────────────────────────────────────
+
+def _sync_ai_translate_entitlement(invoice: Invoice) -> None:
+    purchases = invoice.ai_translate_purchases.all()
+    if not purchases.exists() or invoice.status != Invoice.Status.SUCCESS:
+        return
+
+    try:
+        from pois.models import Partner
+        from payments.models import get_ai_translate_quota_per_purchase
+
+        quota_to_add = get_ai_translate_quota_per_purchase()
+        for purchase in purchases:
+            partner = Partner.objects.filter(user=purchase.user).first()
+            if partner:
+                partner.ai_translate_quota += quota_to_add
+                partner.save(update_fields=['ai_translate_quota'])
+    except Exception:
+        return
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def ai_translate_purchase_create(request):
+    """
+    POST /api/payments/ai-translate/
+    Tạo Invoice + AiTranslatePurchase (PENDING) để Partner mua lượt dịch AI.
+    """
+    from pois.models import Partner
+
+    partner = Partner.objects.filter(user=request.user).first()
+    if not partner:
+        return Response({'error': 'Bạn chưa có hồ sơ partner.'}, status=400)
+
+    amount = get_ai_translate_price_vnd()
+    if amount <= 0:
+        return Response({'error': 'Phí AI Dịch chưa được cấu hình.'}, status=400)
+
+    from payments.models import get_ai_translate_quota_per_purchase
+    quota = get_ai_translate_quota_per_purchase()
+    reason = f'Mua {quota} lượt AI Dịch: {partner.business_name}'
+
+    # Tái sử dụng hóa đơn PENDING nếu có
+    existing = AiTranslatePurchase.objects.filter(
+        user=request.user,
+        invoice__status=Invoice.Status.PENDING
+    ).select_related('invoice').first()
+
+    if existing and existing.invoice:
+        if existing.invoice.amount != amount:
+            existing.invoice.amount = amount
+            existing.invoice.reason = reason
+            existing.invoice.transaction_code = ''
+            existing.invoice.save(update_fields=['amount', 'reason', 'transaction_code'])
+        return Response({
+            'invoice_id': str(existing.invoice.id),
+            'ai_translate_purchase_id': str(existing.id),
+            'amount': existing.invoice.amount,
+            'partner_name': partner.business_name,
+        }, status=200)
+
+    invoice = Invoice.objects.create(
+        user=request.user,
+        reason=reason,
+        amount=amount,
+    )
+
+    purchase = AiTranslatePurchase.objects.create(
+        user=request.user,
+        invoice=invoice,
+    )
+
+    return Response({
+        'invoice_id': str(invoice.id),
+        'ai_translate_purchase_id': str(purchase.id),
+        'amount': invoice.amount,
+        'partner_name': partner.business_name,
+    }, status=201)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def ai_translate_purchase_check(request):
+    """
+    GET /api/payments/ai-translate/check/
+    Trả về số lượt AI Dịch còn lại (quota), giá và số lượt mua mỗi lần.
+    """
+    from pois.models import Partner
+    from payments.models import get_ai_translate_quota_per_purchase
+
+    partner = Partner.objects.filter(user=request.user).first()
+    quota = partner.ai_translate_quota if partner else 0
+    price = get_ai_translate_price_vnd()
+    quota_per_purchase = get_ai_translate_quota_per_purchase()
+
+    return Response({
+        'quota': quota,
+        'price': price,
+        'quota_per_purchase': quota_per_purchase,
+    })

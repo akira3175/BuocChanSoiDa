@@ -15,4 +15,10 @@ urlpatterns = [
     # Premium Partner
     path('partner-premium/', views.partner_premium_purchase_create, name='partner-premium-create'),
     path('partner-premium/check/', views.partner_premium_purchase_check, name='partner-premium-check'),
+    # AI TTS
+    path('ai-tts/', views.ai_tts_purchase_create, name='ai-tts-create'),
+    path('ai-tts/check/', views.ai_tts_purchase_check, name='ai-tts-check'),
+    # AI Dịch
+    path('ai-translate/', views.ai_translate_purchase_create, name='ai-translate-create'),
+    path('ai-translate/check/', views.ai_translate_purchase_check, name='ai-translate-check'),
 ]

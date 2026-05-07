@@ -504,3 +504,221 @@ class POIMapQrResolveView(APIView):
             POIDetailSerializer(poi, context={'request': request}).data,
             status=status.HTTP_200_OK,
         )
+
+
+class MediaGenerateTTSView(APIView):
+    """
+    POST /api/pois/<poi_id>/media/<media_id>/generate-tts/
+    Body (JSON): { "voice": "Aoede" }   ← optional, defaults to media.ai_voice or 'Aoede'
+
+    Tạo audio TTS bằng Gemini AI cho bản ghi Media được chỉ định.
+    Upload lên Cloudinary và cập nhật file_url.
+    Permission: Partner sở hữu POI đó.
+    """
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def post(self, request, poi_id, media_id):
+        from .gemini_tts import generate_tts_audio
+        import cloudinary.uploader
+
+        # Kiểm tra POI ownership
+        poi = None
+        from partners.models import Partner as PartnerModel
+        partner = PartnerModel.objects.filter(user=request.user).first()
+        if partner and partner.poi_id == poi_id:
+            poi = POI.objects.filter(id=poi_id).first()
+        else:
+            poi = POI.objects.filter(id=poi_id, owner=request.user).first()
+
+        if not poi:
+            return Response(
+                {'error': 'Không tìm thấy POI hoặc bạn không có quyền.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            media = Media.objects.get(id=media_id, poi=poi)
+        except Media.DoesNotExist:
+            return Response(
+                {'error': 'Không tìm thấy bản ghi âm thanh.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Lấy text
+        text = media.tts_content or poi.description or ''
+        if not text.strip():
+            return Response(
+                {'error': 'Không có văn bản để tạo TTS. Vui lòng thêm nội dung tts_content trước.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Kiểm tra Partner còn lượt TTS AI không (superuser bypass)
+        if not request.user.is_superuser:
+            from payments.models import get_ai_tts_price_vnd, get_ai_tts_quota_per_purchase
+            if not partner or partner.ai_tts_quota <= 0:
+                price = get_ai_tts_price_vnd()
+                quota_per_purchase = get_ai_tts_quota_per_purchase()
+                price_str = f"{price:,}".replace(',', '.')
+                return Response(
+                    {
+                        'error': f'Bạn đã hết lượt tạo AI TTS. Cần thanh toán {price_str}₫ để mua thêm {quota_per_purchase} lượt.',
+                        'payment_required': True,
+                        'price': price,
+                    },
+                    status=status.HTTP_402_PAYMENT_REQUIRED,
+                )
+
+        # Lấy voice
+        voice = (request.data.get('voice') or media.ai_voice or '').strip()
+        if voice:
+            # Lưu lại voice đã chọn
+            media.ai_voice = voice
+            media.save(update_fields=['ai_voice'])
+        else:
+            voice = media.ai_voice or 'Aoede'
+
+        try:
+            wav_bytes = generate_tts_audio(text=text, voice_name=voice)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except RuntimeError as e:
+            return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        try:
+            uploaded = cloudinary.uploader.upload(
+                wav_bytes,
+                resource_type='video',
+                folder='bcsd/ai-tts',
+                public_id=f'poi_{poi_id}_media_{media_id}_voice_{voice}',
+                overwrite=True,
+                format='wav',
+            )
+            file_url = uploaded.get('secure_url', '')
+        except Exception as e:
+            return Response(
+                {'error': f'Upload Cloudinary thất bại: {e}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        media.file_url = file_url
+        media.media_type = 'AUDIO'
+        media.save(update_fields=['file_url', 'media_type'])
+
+        # Trừ lượt (nếu không phải superuser)
+        if not request.user.is_superuser and partner and partner.ai_tts_quota > 0:
+            partner.ai_tts_quota -= 1
+            partner.save(update_fields=['ai_tts_quota'])
+
+        return Response(
+            {
+                'file_url': file_url,
+                'voice': voice,
+                'media': MediaCRUDSerializer(media).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AITranslateAllView(APIView):
+    """
+    POST /api/pois/<poi_id>/translate-all/
+    Dịch mô tả POI sang tất cả ngôn ngữ có trong Media list chỉ với 1 Gemini request.
+    Trừ 1 lượt ai_translate_quota sau khi thành công.
+    Permission: Partner sở hữu POI đó.
+    """
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def post(self, request, poi_id):
+        from .gemini_translate import translate_poi
+
+        # Kiểm tra quyền sở hữu POI
+        poi = None
+        try:
+            from partners.models import Partner as PartnerModel
+        except ImportError:
+            from pois.models import Partner as PartnerModel
+
+        partner = PartnerModel.objects.filter(user=request.user).first()
+        if partner and partner.poi_id == poi_id:
+            poi = POI.objects.filter(id=poi_id).first()
+
+        if not poi:
+            # Superuser có thể dùng bất kỳ POI nào
+            if request.user.is_superuser:
+                poi = POI.objects.filter(id=poi_id).first()
+            if not poi:
+                return Response(
+                    {'error': 'Bạn không có quyền truy cập POI này.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        # Kiểm tra quota (superuser bypass)
+        if not request.user.is_superuser:
+            if not partner or partner.ai_translate_quota <= 0:
+                from payments.models import get_ai_translate_price_vnd, get_ai_translate_quota_per_purchase
+                return Response({
+                    'error': 'Bạn đã hết lượt dịch AI. Hãy nạp thêm lượt.',
+                    'price': get_ai_translate_price_vnd(),
+                    'quota_per_purchase': get_ai_translate_quota_per_purchase(),
+                }, status=status.HTTP_402_PAYMENT_REQUIRED)
+
+        # Lấy danh sách ngôn ngữ từ Media records hiện có (loại trừ vi)
+        media_qs = Media.objects.filter(poi=poi)
+        languages = list(set(m.language for m in media_qs if m.language and m.language != 'vi'))
+
+        if not languages:
+            return Response(
+                {'error': 'POI chưa có Media với ngôn ngữ nào ngoài tiếng Việt. Hãy thêm Media trước.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Gọi Gemini để dịch
+        source_text = poi.description or ''
+        if not source_text:
+            return Response(
+                {'error': 'POI chưa có mô tả. Hãy điền mô tả trước khi dịch.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            translations = translate_poi(
+                poi_name=poi.name,
+                description=source_text,
+                languages=languages,
+            )
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except RuntimeError as e:
+            return Response({'error': str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        # Cập nhật tts_content & translated_name cho từng Media record
+        updated_media = []
+        for lang, trans in translations.items():
+            translated_name = trans.get('translated_name', poi.name)
+            tts_content = trans.get('tts_content', '')
+            # Cập nhật TẤT CẢ Media records có ngôn ngữ này (mọi voice_region)
+            media_qs.filter(language=lang).update(
+                tts_content=tts_content,
+                translated_name=translated_name,
+            )
+            updated_records = media_qs.filter(language=lang)
+            updated_media.extend(MediaCRUDSerializer(updated_records, many=True).data)
+
+        # Trừ 1 lượt (nếu không phải superuser và còn lượt)
+        if not request.user.is_superuser and partner and partner.ai_translate_quota > 0:
+            partner.ai_translate_quota -= 1
+            partner.save(update_fields=['ai_translate_quota'])
+
+        # Lấy quota thực tế từ DB
+        if partner:
+            partner.refresh_from_db(fields=['ai_translate_quota'])
+            remaining_quota = partner.ai_translate_quota
+        else:
+            remaining_quota = 0
+
+        return Response({
+            'success': True,
+            'translated_languages': list(translations.keys()),
+            'updated_media': updated_media,
+            'remaining_quota': remaining_quota,
+        }, status=status.HTTP_200_OK)

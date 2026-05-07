@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
+import AiTtsCheckout from './AiTtsCheckout';
+import AiTranslateCheckout from './AiTranslateCheckout';
 import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -28,6 +30,41 @@ const VOICE_REGION_LABELS: Record<string, string> = {
   usa: 'USA',
   uk: 'UK',
 };
+
+// 30 giọng Gemini TTS (theo tài liệu chính thức)
+const GEMINI_VOICES = [
+  { name: 'Zephyr',        style: 'Bright' },
+  { name: 'Puck',          style: 'Upbeat' },
+  { name: 'Charon',        style: 'Informative' },
+  { name: 'Kore',          style: 'Firm' },
+  { name: 'Fenrir',        style: 'Excitable' },
+  { name: 'Leda',          style: 'Youthful' },
+  { name: 'Orus',          style: 'Firm' },
+  { name: 'Aoede',         style: 'Breezy' },
+  { name: 'Callirrhoe',    style: 'Easy-going' },
+  { name: 'Autonoe',       style: 'Bright' },
+  { name: 'Enceladus',     style: 'Breathy' },
+  { name: 'Iapetus',       style: 'Clear' },
+  { name: 'Umbriel',       style: 'Easy-going' },
+  { name: 'Algieba',       style: 'Smooth' },
+  { name: 'Despina',       style: 'Smooth' },
+  { name: 'Erinome',       style: 'Clear' },
+  { name: 'Algenib',       style: 'Gravelly' },
+  { name: 'Rasalgethi',    style: 'Informative' },
+  { name: 'Laomedeia',     style: 'Upbeat' },
+  { name: 'Achernar',      style: 'Soft' },
+  { name: 'Alnilam',       style: 'Firm' },
+  { name: 'Schedar',       style: 'Even' },
+  { name: 'Gacrux',        style: 'Mature' },
+  { name: 'Pulcherrima',   style: 'Forward' },
+  { name: 'Achird',        style: 'Friendly' },
+  { name: 'Zubenelgenubi', style: 'Casual' },
+  { name: 'Vindemiatrix',  style: 'Gentle' },
+  { name: 'Sadachbia',     style: 'Lively' },
+  { name: 'Sadaltager',    style: 'Knowledgeable' },
+  { name: 'Sulafat',       style: 'Warm' },
+] as const;
+
 
 function languageSelectLabel(code: string): string {
   return LANGUAGE_LABELS[code] ?? code.toUpperCase();
@@ -121,8 +158,50 @@ export default function PartnerPOI() {
   const [mapQrExpiresAt, setMapQrExpiresAt] = useState<string | null>(null);
   const [mapQrLoading, setMapQrLoading] = useState(false);
   const [mapQrError, setMapQrError] = useState('');
+  // AI TTS state per-media: map mediaId → { voice, loading, error }
+  const [aiTtsState, setAiTtsState] = useState<Record<string, { voice: string; loading: boolean; error: string }>>({});
+  // AI TTS purchase status
+  const [aiTtsQuota, setAiTtsQuota] = useState(0);
+  const [aiTtsPrice, setAiTtsPrice] = useState(25000);
+  const [aiTtsQuotaPerPurchase, setAiTtsQuotaPerPurchase] = useState(5);
 
+  const [showTtsCheckout, setShowTtsCheckout] = useState(false);
 
+  // AI Translate states
+  const [aiTranslateQuota, setAiTranslateQuota] = useState(0);
+  const [aiTranslatePrice, setAiTranslatePrice] = useState(50000);
+  const [aiTranslateQuotaPerPurchase, setAiTranslateQuotaPerPurchase] = useState(10);
+  const [aiTranslating, setAiTranslating] = useState(false);
+  const [aiTranslateError, setAiTranslateError] = useState('');
+  const [showTranslateCheckout, setShowTranslateCheckout] = useState(false);
+
+  const fetchTtsQuota = async () => {
+    try {
+      const { data } = await apiClient.get<{ quota: number; price: number; quota_per_purchase: number }>('/payments/ai-tts/check/');
+      setAiTtsQuota(data.quota);
+      setAiTtsPrice(data.price || 25000);
+      setAiTtsQuotaPerPurchase(data.quota_per_purchase || 5);
+    } catch {
+      // Silently fail — default to 0
+    }
+  };
+
+  const fetchTranslateQuota = async () => {
+    try {
+      const { data } = await apiClient.get<{ quota: number; price: number; quota_per_purchase: number }>('/payments/ai-translate/check/');
+      setAiTranslateQuota(data.quota);
+      setAiTranslatePrice(data.price || 50000);
+      setAiTranslateQuotaPerPurchase(data.quota_per_purchase || 10);
+    } catch {
+      // Silently fail
+    }
+  };
+
+  // Check AI TTS purchase status
+  useEffect(() => {
+    void fetchTtsQuota();
+    void fetchTranslateQuota();
+  }, []);
 
   useEffect(() => {
     const fetchMyPoi = async () => {
@@ -381,9 +460,56 @@ export default function PartnerPOI() {
     }
   };;
 
+  const getAiTts = (mediaId: string) =>
+    aiTtsState[mediaId] ?? { voice: 'Aoede', loading: false, error: '' };
 
+  const generateAiTts = async (m: Media) => {
+    if (!poi?.id) return;
+    // Kiểm tra quota
+    if (aiTtsQuota <= 0) {
+      const priceStr = aiTtsPrice.toLocaleString('vi-VN');
+      setError(`Bạn đã hết lượt tạo AI TTS. Hãy nạp thêm ${aiTtsQuotaPerPurchase} lượt với phí ${priceStr}₫ bằng nút bên dưới.`);
+      return;
+    }
+    const cur = getAiTts(m.id);
+    if (cur.loading) return;
+    const chosenVoice = cur.voice || 'Aoede';
+    setAiTtsState((s) => ({ ...s, [m.id]: { ...cur, loading: true, error: '' } }));
+    try {
+      const { data } = await apiClient.post<{ file_url: string; voice: string; media: Media }>(
+        `/pois/${poi.id}/media/${m.id}/generate-tts/`,
+        { voice: chosenVoice },
+      );
+      // Cập nhật POI media list inline
+      setPoi((prev) =>
+        prev
+          ? {
+              ...prev,
+              media: (prev.media ?? []).map((x) =>
+                x.id === m.id ? { ...x, file_url: data.file_url, media_type: 'AUDIO' } : x,
+              ),
+            }
+          : prev,
+      );
+      setAiTtsState((s) => ({ ...s, [m.id]: { voice: chosenVoice, loading: false, error: '' } }));
+      // Trừ 1 lượt trên frontend sau khi thành công
+      setAiTtsQuota((q) => Math.max(0, q - 1));
+      alert(`✅ Đã tạo TTS bằng giọng ${chosenVoice} thành công! (Còn ${aiTtsQuota - 1} lượt)`);
+    } catch (err) {
+      // Xử lý trường hợp chưa thanh toán/hết lượt (HTTP 402)
+      if (axios.isAxiosError(err) && err.response?.status === 402) {
+        setAiTtsQuota(0);
+        const respPrice = err.response?.data?.price;
+        if (respPrice) setAiTtsPrice(Number(respPrice));
+      }
+      const msg = getApiErrorMessage(err, 'Tạo TTS AI thất bại.');
+      setAiTtsState((s) => ({ ...s, [m.id]: { voice: chosenVoice, loading: false, error: msg } }));
+    }
+  };
 
-
+  const buyAiTts = () => {
+    setShowTtsCheckout(true);
+  };
 
   const errorPopup =
     typeof document !== 'undefined' &&
@@ -565,6 +691,58 @@ export default function PartnerPOI() {
                 </select>
               </div>
             </div>
+            {/* 🌐 AI Dịch tất cả ngôn ngữ */}
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-emerald-700">🌐 AI Dịch</span>
+                <span className="text-[10px] text-slate-500">
+                  Còn: <strong className={aiTranslateQuota > 0 ? 'text-emerald-700' : 'text-rose-600'}>{aiTranslateQuota}</strong> lượt
+                </span>
+              </div>
+              {aiTranslateError && <p className="w-full text-[10px] font-medium text-red-600">{aiTranslateError}</p>}
+              {aiTranslateQuota <= 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowTranslateCheckout(true)}
+                  className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700"
+                >
+                  <span className="material-symbols-outlined text-[14px]">add_circle</span>
+                  Nạp {aiTranslateQuotaPerPurchase} lượt ({aiTranslatePrice.toLocaleString('vi-VN')}₫)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={aiTranslating}
+                  onClick={async () => {
+                    if (!poi?.id) return;
+                    setAiTranslating(true);
+                    setAiTranslateError('');
+                    try {
+                      const { data } = await apiClient.post<{ success: boolean; remaining_quota: number }>(`/pois/${poi.id}/translate-all/`);
+                      setAiTranslateQuota(data.remaining_quota);
+                      // Reload lại POI media
+                      const { data: updated } = await apiClient.get<POI>('/pois/my-poi/');
+                      setPoi(updated);
+                    } catch (e) {
+                      if (axios.isAxiosError(e) && e.response?.status === 402) {
+                        setShowTranslateCheckout(true);
+                      } else {
+                        setAiTranslateError(getApiErrorMessage(e, 'Dịch thất bại. Vui lòng thử lại.'));
+                      }
+                    } finally {
+                      setAiTranslating(false);
+                    }
+                  }}
+                  className="flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {aiTranslating ? (
+                    <><span className="animate-spin material-symbols-outlined text-[14px]">autorenew</span> Đang dịch...</>
+                  ) : (
+                    <><span className="material-symbols-outlined text-[14px]">translate</span> Dịch tất cả</>
+                  )}
+                </button>
+              )}
+            </div>
             <p className="mb-3 text-xs text-slate-500">
               Chọn ngôn ngữ để xem từng bản TTS / file âm thanh. Mỗi dòng có thể là giọng miền khác nhau.
             </p>
@@ -614,6 +792,72 @@ export default function PartnerPOI() {
                         {isRowPlaying ? 'Dừng' : 'Nghe'}
                       </button>
                     </div>
+                    {/* 🤖 AI TTS — chọn giọng + tạo */}
+                    {(() => {
+                      const ai = getAiTts(m.id);
+                      return (
+                        <div className="mt-2 flex flex-col gap-2 border-t border-slate-100 pt-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-violet-700">🤖 Gemini TTS</span>
+                            <span className="text-[10px] font-medium text-slate-500">
+                              Lượt dùng: <strong className={aiTtsQuota > 0 ? "text-violet-700" : "text-rose-600"}>{aiTtsQuota}</strong>
+                            </span>
+                          </div>
+
+                          {ai.error && <p className="text-[10px] font-medium text-red-600">{ai.error}</p>}
+
+                          {aiTtsQuota <= 0 ? (
+                            <div className="flex flex-col items-start gap-1 rounded-lg border border-violet-200 bg-violet-50/50 p-2">
+                              <span className="text-xs text-slate-600">
+                                Mua gói {aiTtsQuotaPerPurchase} lượt với phí {aiTtsPrice.toLocaleString('vi-VN')}₫ để sử dụng AI TTS.
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => void buyAiTts()}
+                                className="mt-1 flex shrink-0 items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-violet-700"
+                              >
+                                <span className="text-[14px] material-symbols-outlined">add_circle</span>
+                                Nạp {aiTtsQuotaPerPurchase} lượt
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <select
+                                id={`ai-voice-${m.id}`}
+                                value={ai.voice}
+                                onChange={(e) =>
+                                  setAiTtsState((s) => ({ ...s, [m.id]: { ...getAiTts(m.id), voice: e.target.value } }))
+                                }
+                                disabled={ai.loading}
+                                className="flex-1 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-violet-400 disabled:opacity-50"
+                              >
+                                {GEMINI_VOICES.map((v) => (
+                                  <option key={v.name} value={v.name}>
+                                    {v.name} — {v.style}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                id={`btn-ai-tts-${m.id}`}
+                                disabled={ai.loading}
+                                onClick={() => void generateAiTts(m)}
+                                className="flex shrink-0 items-center gap-1 rounded-lg border border-violet-300 bg-violet-50 px-2.5 py-1.5 text-xs font-bold text-violet-700 transition hover:bg-violet-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {ai.loading ? (
+                                  <>
+                                    <span className="animate-spin text-[14px] material-symbols-outlined">autorenew</span>{' '}
+                                    Đang tạo...
+                                  </>
+                                ) : (
+                                  '🤖 Tạo TTS AI'
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </li>
                 );
               })}
@@ -733,6 +977,28 @@ export default function PartnerPOI() {
               </div>
             </div>
           </>
+        )}
+        {showTtsCheckout && (
+          <AiTtsCheckout
+            amount={aiTtsPrice}
+            quotaPerPurchase={aiTtsQuotaPerPurchase}
+            onClose={() => setShowTtsCheckout(false)}
+            onSuccess={() => {
+              setShowTtsCheckout(false);
+              void fetchTtsQuota();
+            }}
+          />
+        )}
+        {showTranslateCheckout && (
+          <AiTranslateCheckout
+            amount={aiTranslatePrice}
+            quotaPerPurchase={aiTranslateQuotaPerPurchase}
+            onClose={() => setShowTranslateCheckout(false)}
+            onSuccess={() => {
+              setShowTranslateCheckout(false);
+              void fetchTranslateQuota();
+            }}
+          />
         )}
       </div>
     </section>

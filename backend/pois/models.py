@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import math
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -155,6 +157,13 @@ class Media(models.Model):
         default='',
         help_text='mien_nam, mien_bac, mien_trung, usa, uk, ...',
     )
+    ai_voice = models.CharField(
+        'Giọng Gemini AI',
+        max_length=50,
+        blank=True,
+        default='',
+        help_text='Tên giọng Gemini TTS (Aoede, Kore, Puck, ...). Để trống để dùng giọng mặc định Aoede.',
+    )
     media_type = models.CharField(
         'Loại media',
         max_length=10,
@@ -240,6 +249,16 @@ class Partner(models.Model):
         default='',
         max_length=500,
         help_text='URL sẽ mã hoá thành QR Code hiện trên app (ví dụ: link Google Maps, Facebook, Shopeefood...)',
+    )
+    ai_tts_quota = models.PositiveIntegerField(
+        'Số lượt TTS AI còn lại',
+        default=0,
+        help_text='Số lượt tạo âm thanh TTS bằng Gemini AI.',
+    )
+    ai_translate_quota = models.PositiveIntegerField(
+        'Số lượt Dịch AI còn lại',
+        default=0,
+        help_text='Số lượt dịch tự động tất cả ngôn ngữ POI bằng Gemini AI.',
     )
     status = models.IntegerField(
         'Trạng thái',
@@ -373,3 +392,81 @@ class PartnerInteraction(models.Model):
     def __str__(self):
         user_info = f'({self.user.email})' if self.user else '(anonymous)'
         return f'{self.partner.business_name} {self.get_interaction_type_display()} {user_info}'
+
+
+# ─── Gemini API Config (Singleton, Fernet-encrypted) ────────────────────────
+
+def _get_fernet():
+    """Tạo Fernet cipher từ SECRET_KEY của Django (derive 32-byte key via SHA-256)."""
+    from cryptography.fernet import Fernet
+    raw = settings.SECRET_KEY.encode()
+    key = base64.urlsafe_b64encode(hashlib.sha256(raw).digest())
+    return Fernet(key)
+
+
+class GeminiApiConfig(models.Model):
+    """
+    Cấu hình Gemini AI API Key — singleton (pk=1).
+    API Key được mã hóa Fernet trước khi lưu vào DB.
+    Chỉ superuser mới được xem/chỉnh sửa trong Django Admin.
+    """
+
+    _api_key_encrypted = models.BinaryField(
+        'API Key (Encrypted)',
+        blank=True,
+        default=b'',
+        help_text='Tự động mã hóa khi lưu. Không chỉnh sửa trực tiếp trường này.',
+    )
+    tts_model = models.CharField(
+        'Model TTS',
+        max_length=100,
+        default='gemini-2.5-flash-preview-tts',
+        help_text='Tên model Gemini TTS, ví dụ: gemini-2.5-flash-preview-tts',
+    )
+    default_voice = models.CharField(
+        'Giọng mặc định',
+        max_length=50,
+        default='Aoede',
+        help_text='Giọng nói mặc định khi không chỉ định cụ thể.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'gemini_api_config'
+        verbose_name = 'Cấu hình Gemini AI'
+        verbose_name_plural = 'Cấu hình Gemini AI'
+
+    def save(self, *args, **kwargs):
+        # Giữ singleton pk=1
+        self.pk = 1
+        if not self.created_at:
+            from django.utils import timezone
+            self.created_at = timezone.now()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def api_key(self) -> str:
+        """Giải mã và trả về API Key dạng plaintext."""
+        if not self._api_key_encrypted:
+            return ''
+        try:
+            return _get_fernet().decrypt(bytes(self._api_key_encrypted)).decode()
+        except Exception:
+            return ''
+
+    @api_key.setter
+    def api_key(self, value: str) -> None:
+        """Mã hóa API Key trước khi lưu."""
+        if value:
+            self._api_key_encrypted = _get_fernet().encrypt(value.encode())
+        else:
+            self._api_key_encrypted = b''
+
+    def __str__(self):
+        return 'Cấu hình Gemini AI'

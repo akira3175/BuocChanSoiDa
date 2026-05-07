@@ -117,19 +117,31 @@ export default function QRScanOverlay({ onClose, onScanSuccess }: QRScanOverlayP
             }
 
             await handlePOI(poi);
-        } catch (err) {
+        } catch (err: any) {
             console.error('[QR Scan] Failed processing:', err);
-            const mockPoi: POI = {
-                id: 'demo-001',
-                name: 'Phố Ẩm Thực Vĩnh Khánh',
-                description: 'Vĩnh Khánh là con phố ẩm thực nổi tiếng tại Quận 4, TP. Hồ Chí Minh.',
-                latitude: 10.755,
-                longitude: 106.703,
-                geofence_radius: 50,
-                category: 'food',
-                qr_code_data: decodedText,
-            };
-            await handlePOI(mockPoi);
+            processedRef.current = false;
+            setScanOk(false);
+
+            // Re-start camera
+            if (html5QrRef.current && !html5QrRef.current.isScanning) {
+                html5QrRef.current.start(
+                    { facingMode: 'environment' },
+                    { fps: 10, qrbox: { width: 240, height: 240 } },
+                    (decodedText) => handleQRResult(decodedText),
+                    () => { /* ignore frame failures */ }
+                ).catch(() => setCameraError(true));
+            }
+
+            const status = err.response?.status;
+            let errorMsg = t('qr.invalidCode') || 'Mã QR không hợp lệ hoặc không thuộc hệ thống.';
+            
+            if (status === 410) {
+                errorMsg = t('qr.expired') || 'Mã QR này đã hết hạn (giới hạn 1 giờ). Vui lòng quét mã mới tại quầy.';
+            } else if (status === 404) {
+                errorMsg = t('qr.notFound') || 'Không tìm thấy điểm tham quan tương ứng với mã này.';
+            }
+
+            alert(errorMsg);
         }
     }, [handlePOI]);
 
