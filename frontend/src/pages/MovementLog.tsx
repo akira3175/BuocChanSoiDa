@@ -114,8 +114,6 @@ export default function MovementLog() {
         return d;
     }, [points]);
 
-    const routePoints = useMemo<[number, number][]>(() =>
-        points.map(p => [p.lat, p.long]), [points]);
 
     const grouped = useMemo(() => groupByDay(points), [points]);
     const dayKeys = useMemo(() => [...grouped.keys()].reverse(), [grouped]);
