@@ -64,7 +64,7 @@ export default function Settings() {
     const handleUserLogout = () => {
         setUserAuthSession(null);
         dispatch({ type: 'CLEAR_USER' });
-        navigate('/login', { replace: true });
+        navigate('/', { replace: true });
     };
 
     const handleOpenInvoice = () => {
