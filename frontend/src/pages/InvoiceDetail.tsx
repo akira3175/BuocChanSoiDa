@@ -1,19 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PayPalButtons } from '@paypal/react-paypal-js';
+import { useTranslation } from 'react-i18next';
 import AppLayout from '../components/AppLayout';
 import { getApiErrorMessage, getInvoiceById, getInvoices, isUserAuthenticated, paypalCaptureOrder, paypalCreateOrder } from '../services/api';
 import type { Invoice } from '../services/api';
 
 type StatusFilter = 'ALL' | 'SUCCESS' | 'PENDING' | 'FAILED' | 'CANCELLED';
-
-const STATUS_TABS: { id: StatusFilter; label: string }[] = [
-    { id: 'ALL', label: 'Tất cả' },
-    { id: 'SUCCESS', label: 'Thành công' },
-    { id: 'PENDING', label: 'Đang xử lý' },
-    { id: 'FAILED', label: 'Thất bại' },
-    { id: 'CANCELLED', label: 'Đã huỷ' },
-];
 
 function statusBadgeClass(status?: string) {
     if (status === 'SUCCESS') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -36,29 +29,25 @@ function statusIconColor(status?: string) {
     return 'text-rose-500';
 }
 
-function statusLabel(status?: string) {
-    if (status === 'SUCCESS') return 'Thành công';
-    if (status === 'PENDING') return 'Đang xử lý';
-    if (status === 'CANCELLED') return 'Đã huỷ';
-    if (status === 'FAILED') return 'Thất bại';
-    return status ?? '—';
-}
-
-function formatDateTime(iso: string | null | undefined): string {
+function formatDateTime(iso: string | null | undefined, lang: string): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleString('vi-VN', {
+    const locale = lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : lang === 'ko' ? 'ko-KR' : lang === 'en' ? 'en-US' : 'vi-VN';
+    return new Date(iso).toLocaleString(locale, {
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit',
     });
 }
 
-function formatDateShort(iso: string): string {
-    return new Date(iso).toLocaleDateString('vi-VN', {
+function formatDateShort(iso: string, lang: string): string {
+    const locale = lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : lang === 'ko' ? 'ko-KR' : lang === 'en' ? 'en-US' : 'vi-VN';
+    return new Date(iso).toLocaleDateString(locale, {
         day: '2-digit', month: '2-digit', year: 'numeric',
     });
 }
 
 export default function InvoiceDetail() {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.language;
     const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
     const invoiceIdParam = params.get('invoiceId') || '';
@@ -70,6 +59,22 @@ export default function InvoiceDetail() {
     const [error, setError] = useState<string>('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
     const [showPayPanel, setShowPayPanel] = useState(false);
+
+    const STATUS_TABS: { id: StatusFilter; label: string }[] = [
+        { id: 'ALL', label: t('invoice.tabAll') },
+        { id: 'SUCCESS', label: t('invoice.tabSuccess') },
+        { id: 'PENDING', label: t('invoice.tabPending') },
+        { id: 'FAILED', label: t('invoice.tabFailed') },
+        { id: 'CANCELLED', label: t('invoice.tabCancelled') },
+    ];
+
+    const statusLabel = (status?: string) => {
+        if (status === 'SUCCESS') return t('invoice.statusSuccess');
+        if (status === 'PENDING') return t('invoice.statusPending');
+        if (status === 'CANCELLED') return t('invoice.statusCancelled');
+        if (status === 'FAILED') return t('invoice.statusFailed');
+        return status ?? '—';
+    };
 
     // Load data
     useEffect(() => {
@@ -134,7 +139,7 @@ export default function InvoiceDetail() {
     };
 
     return (
-        <AppLayout title="Hóa đơn" showBack backPath="/settings">
+        <AppLayout title={t('invoice.title')} showBack backPath="/settings">
             <div className="pb-6">
                 {loading ? (
                     <div className="px-4 pt-4 space-y-3 animate-fade-in">
@@ -154,7 +159,7 @@ export default function InvoiceDetail() {
                             onClick={() => navigate('/settings')}
                             className="mt-3 w-full py-2 rounded-xl bg-rose-100 text-rose-700 text-sm font-bold"
                         >
-                            Quay lại
+                            {t('invoice.goBack')}
                         </button>
                     </div>
                 ) : !isUserAuthenticated() ? (
@@ -162,9 +167,9 @@ export default function InvoiceDetail() {
                         <div className="size-24 rounded-full bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center mb-5 animate-float">
                             <span className="material-symbols-outlined text-5xl text-amber-400" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
                         </div>
-                        <h3 className="text-slate-900 font-bold text-lg mb-2">Vui lòng đăng nhập</h3>
+                        <h3 className="text-slate-900 font-bold text-lg mb-2">{t('invoice.loginRequired')}</h3>
                         <p className="text-slate-400 text-sm leading-relaxed">
-                            Bạn cần đăng nhập để xem lịch sử thanh toán.
+                            {t('invoice.loginDesc')}
                         </p>
                     </div>
                 ) : allInvoices.length === 0 ? (
@@ -173,9 +178,9 @@ export default function InvoiceDetail() {
                         <div className="size-24 rounded-full bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center mb-5 animate-float">
                             <span className="material-symbols-outlined text-5xl text-slate-300" style={{ fontVariationSettings: "'FILL' 1" }}>receipt_long</span>
                         </div>
-                        <h3 className="text-slate-900 font-bold text-lg mb-2">Chưa có hóa đơn</h3>
+                        <h3 className="text-slate-900 font-bold text-lg mb-2">{t('invoice.emptyTitle')}</h3>
                         <p className="text-slate-400 text-sm leading-relaxed">
-                            Hóa đơn của bạn sẽ xuất hiện ở đây sau khi thanh toán.
+                            {t('invoice.emptyDesc')}
                         </p>
                     </div>
                 ) : (
@@ -187,22 +192,22 @@ export default function InvoiceDetail() {
                                     <div className="size-8 rounded-full bg-white/10 flex items-center justify-center">
                                         <span className="material-symbols-outlined text-white text-base" style={{ fontVariationSettings: "'FILL' 1" }}>receipt_long</span>
                                     </div>
-                                    <p className="text-white/70 text-xs font-semibold uppercase tracking-wider">Tổng quan hóa đơn</p>
+                                    <p className="text-white/70 text-xs font-semibold uppercase tracking-wider">{t('invoice.summaryTitle')}</p>
                                 </div>
                                 <div className="flex items-end justify-between">
                                     <div>
-                                        <p className="text-white/60 text-xs mb-1">Tổng đã thanh toán</p>
+                                        <p className="text-white/60 text-xs mb-1">{t('invoice.totalPaid')}</p>
                                         <p className="text-white text-2xl font-black">{totalSpent.toLocaleString('vi-VN')}₫</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-white/60 text-xs mb-1">Số hóa đơn</p>
+                                        <p className="text-white/60 text-xs mb-1">{t('invoice.invoiceCount')}</p>
                                         <p className="text-white text-2xl font-black">{allInvoices.length}</p>
                                     </div>
                                 </div>
                                 {pendingCount > 0 && (
                                     <div className="mt-3 flex items-center gap-1.5 bg-amber-400/20 border border-amber-400/30 rounded-lg px-3 py-2">
                                         <span className="material-symbols-outlined text-amber-300 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>pending</span>
-                                        <p className="text-amber-200 text-xs font-semibold">{pendingCount} hóa đơn đang chờ thanh toán</p>
+                                        <p className="text-amber-200 text-xs font-semibold">{t('invoice.pendingAlert', { count: pendingCount })}</p>
                                     </div>
                                 )}
                             </div>
@@ -236,7 +241,7 @@ export default function InvoiceDetail() {
                         <div className="px-4 mt-3 space-y-2 animate-fade-slide-up">
                             {filteredInvoices.length === 0 ? (
                                 <div className="py-8 text-center text-slate-400 text-sm">
-                                    Không có hóa đơn nào trong trạng thái này.
+                                    {t('invoice.emptyFilter')}
                                 </div>
                             ) : (
                                 filteredInvoices.map((inv) => (
@@ -266,7 +271,7 @@ export default function InvoiceDetail() {
                                             {/* Info */}
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-bold text-slate-800 truncate">{inv.reason}</p>
-                                                <p className="text-xs text-slate-400 mt-0.5">{formatDateShort(inv.created_at)}</p>
+                                                <p className="text-xs text-slate-400 mt-0.5">{formatDateShort(inv.created_at, lang)}</p>
                                             </div>
 
                                             {/* Amount + Badge */}
@@ -294,7 +299,7 @@ export default function InvoiceDetail() {
                                         >
                                             {statusIcon(selectedInvoice.status)}
                                         </span>
-                                        <p className="text-sm font-bold text-slate-800">Chi tiết hóa đơn</p>
+                                        <p className="text-sm font-bold text-slate-800">{t('invoice.detailTitle')}</p>
                                     </div>
                                     <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${statusBadgeClass(selectedInvoice.status)}`}>
                                         {statusLabel(selectedInvoice.status)}
@@ -304,12 +309,12 @@ export default function InvoiceDetail() {
                                 {/* Fields */}
                                 <div className="p-4 space-y-3">
                                     <div>
-                                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Lý do thanh toán</p>
+                                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">{t('invoice.reason')}</p>
                                         <p className="text-sm font-bold text-slate-900">{selectedInvoice.reason}</p>
                                     </div>
 
                                     <div>
-                                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Số tiền</p>
+                                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">{t('invoice.amount')}</p>
                                         <p className="text-3xl font-black text-slate-900 tracking-tight">
                                             {selectedInvoice.amount.toLocaleString('vi-VN')}
                                             <span className="text-lg ml-1 text-slate-500">₫</span>
@@ -318,20 +323,20 @@ export default function InvoiceDetail() {
 
                                     <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 space-y-2">
                                         <div className="flex justify-between text-xs">
-                                            <span className="text-slate-500">Mã hóa đơn</span>
+                                            <span className="text-slate-500">{t('invoice.invoiceId')}</span>
                                             <span className="text-slate-700 font-mono text-[10px] max-w-[160px] truncate">{selectedInvoice.id}</span>
                                         </div>
                                         <div className="flex justify-between text-xs">
-                                            <span className="text-slate-500">Mã giao dịch</span>
+                                            <span className="text-slate-500">{t('invoice.transactionCode')}</span>
                                             <span className="text-slate-700 font-mono">{selectedInvoice.transaction_code || '—'}</span>
                                         </div>
                                         <div className="flex justify-between text-xs">
-                                            <span className="text-slate-500">Ngày tạo</span>
-                                            <span className="text-slate-700">{formatDateTime(selectedInvoice.created_at)}</span>
+                                            <span className="text-slate-500">{t('invoice.createdAt')}</span>
+                                            <span className="text-slate-700">{formatDateTime(selectedInvoice.created_at, lang)}</span>
                                         </div>
                                         <div className="flex justify-between text-xs">
-                                            <span className="text-slate-500">Thanh toán lúc</span>
-                                            <span className="text-slate-700">{formatDateTime(selectedInvoice.paid_at)}</span>
+                                            <span className="text-slate-500">{t('invoice.paidAt')}</span>
+                                            <span className="text-slate-700">{formatDateTime(selectedInvoice.paid_at, lang)}</span>
                                         </div>
                                     </div>
 
@@ -339,7 +344,7 @@ export default function InvoiceDetail() {
                                     {selectedInvoice.status === 'SUCCESS' ? (
                                         <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-50 border border-emerald-200">
                                             <span className="material-symbols-outlined text-emerald-500 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                                            <span className="text-sm font-bold text-emerald-700">Đã thanh toán thành công</span>
+                                            <span className="text-sm font-bold text-emerald-700">{t('invoice.paidSuccessLabel')}</span>
                                         </div>
                                     ) : selectedInvoice.status === 'PENDING' ? (
                                         <>
@@ -348,7 +353,7 @@ export default function InvoiceDetail() {
                                                 className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 tap-scale shadow-sm shadow-primary/30"
                                             >
                                                 <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>payment</span>
-                                                {showPayPanel ? 'Ẩn thanh toán' : 'Thanh toán ngay'}
+                                                {showPayPanel ? t('invoice.hidePayment') : t('invoice.payNow')}
                                             </button>
 
                                             {showPayPanel && (
@@ -383,7 +388,7 @@ export default function InvoiceDetail() {
                                                         }}
                                                         onError={(err: unknown) => {
                                                             console.error(err);
-                                                            setError('Không thể khởi tạo PayPal. Vui lòng thử lại.');
+                                                            setError(t('invoice.paypalError'));
                                                         }}
                                                     />
                                                 </div>
@@ -393,7 +398,7 @@ export default function InvoiceDetail() {
                                         <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-50 border border-slate-200">
                                             <span className="material-symbols-outlined text-slate-400 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>info</span>
                                             <span className="text-sm font-semibold text-slate-500">
-                                                {selectedInvoice.status === 'CANCELLED' ? 'Hóa đơn đã bị huỷ' : 'Thanh toán thất bại'}
+                                                {selectedInvoice.status === 'CANCELLED' ? t('invoice.cancelledLabel') : t('invoice.failedLabel')}
                                             </span>
                                         </div>
                                     )}

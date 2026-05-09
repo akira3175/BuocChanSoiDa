@@ -335,9 +335,9 @@ export default function Settings() {
                 >
                     <div className="flex items-center justify-between gap-3">
                         <div>
-                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Hành trình</p>
-                            <h3 className="mt-1 text-sm font-bold text-slate-900">Lịch sử di chuyển</h3>
-                            <p className="mt-1 text-xs text-slate-500">Xem lại tuyến đường và điểm GPS đã đi</p>
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('settings.movementLogSection')}</p>
+                            <h3 className="mt-1 text-sm font-bold text-slate-900">{t('settings.movementLogTitle')}</h3>
+                            <p className="mt-1 text-xs text-slate-500">{t('settings.movementLogDesc')}</p>
                         </div>
                         <div className="flex size-10 items-center justify-center rounded-full bg-primary text-white">
                             <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>route</span>
