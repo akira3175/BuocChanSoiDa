@@ -175,6 +175,25 @@ class POIMediaView(APIView):
         media = serializer.save()
         return Response(MediaSerializer(media).data, status=status.HTTP_201_CREATED)
 
+class MediaDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET/PUT/PATCH/DELETE /api/pois/<poi_id>/media/<pk>/
+    Quản lý một bản ghi Media cụ thể.
+    """
+    queryset = Media.objects.all()
+    serializer_class = MediaCRUDSerializer
+    permission_classes = [IsAuthenticated, IsPartner]
+
+    def get_queryset(self):
+        # Chỉ cho phép partner quản lý media của POI mình sở hữu
+        return Media.objects.filter(
+            poi__id=self.kwargs['poi_id'],
+            poi__owner=self.request.user
+        ) | Media.objects.filter(
+            poi__id=self.kwargs['poi_id'],
+            poi__partners__user=self.request.user
+        ).distinct()
+
 class POIPartnersView(generics.ListAPIView):
     """
     GET /api/pois/<poi_id>/partners/
@@ -544,8 +563,15 @@ class MediaGenerateTTSView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Lấy text
-        text = media.tts_content or poi.description or ''
+        # Lấy text (ưu tiên từ request body -> media.tts_content -> poi.description)
+        text = request.data.get('tts_content') or media.tts_content or poi.description or ''
+        
+        # Nếu gửi text mới lên, lưu lại vào media record luôn
+        new_text = request.data.get('tts_content')
+        if new_text and new_text.strip() and new_text != media.tts_content:
+            media.tts_content = new_text.strip()
+            media.save(update_fields=['tts_content'])
+
         if not text.strip():
             return Response(
                 {'error': 'Không có văn bản để tạo TTS. Vui lòng thêm nội dung tts_content trước.'},

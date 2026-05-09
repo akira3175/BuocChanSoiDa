@@ -607,6 +607,11 @@ export const getPOIMedia = async (poiId: string, language: string, voiceRegion: 
     }
 };
 
+export const updatePOIMedia = async (poiId: string | number, mediaId: string | number, payload: Partial<Media>): Promise<Media> => {
+    const { data } = await apiClient.patch<Media>(`/pois/${poiId}/media/${mediaId}/`, payload);
+    return data;
+};
+
 export const getPOIPartners = async (poiId: string): Promise<Partner[]> => {
     try {
         const { data } = await apiClient.get(`/pois/${poiId}/partners/`);

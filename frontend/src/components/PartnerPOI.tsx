@@ -8,7 +8,7 @@ import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
-import apiClient, { getApiErrorMessage, getPartnerMapQrUrl, uploadPOICoverImage } from '../services/api';
+import apiClient, { getApiErrorMessage, getPartnerMapQrUrl, uploadPOICoverImage, updatePOIMedia } from '../services/api';
 import type { Media, POI, POICategory } from '../types';
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -158,8 +158,8 @@ export default function PartnerPOI() {
   const [mapQrExpiresAt, setMapQrExpiresAt] = useState<string | null>(null);
   const [mapQrLoading, setMapQrLoading] = useState(false);
   const [mapQrError, setMapQrError] = useState('');
-  // AI TTS state per-media: map mediaId → { voice, loading, error }
-  const [aiTtsState, setAiTtsState] = useState<Record<string, { voice: string; loading: boolean; error: string }>>({});
+  // AI TTS state per-media: map mediaId → { voice, loading, error, ttsContent, saving }
+  const [aiTtsState, setAiTtsState] = useState<Record<string, { voice: string; loading: boolean; error: string; ttsContent?: string; saving?: boolean }>>({});
   // AI TTS purchase status
   const [aiTtsQuota, setAiTtsQuota] = useState(0);
   const [aiTtsPrice, setAiTtsPrice] = useState(25000);
@@ -411,6 +411,26 @@ export default function PartnerPOI() {
     }
   };
 
+  const handleSaveTtsContent = async (m: Media) => {
+    if (!poi?.id) return;
+    const cur = aiTtsState[m.id];
+    const text = cur?.ttsContent;
+    if (text === undefined || text === m.tts_content) return;
+
+    setAiTtsState(s => ({ ...s, [m.id]: { ...getAiTts(m.id), saving: true } }));
+    try {
+      const updated = await updatePOIMedia(poi.id, m.id, { tts_content: text });
+      setPoi(prev => prev ? {
+        ...prev,
+        media: (prev.media ?? []).map(x => x.id === m.id ? { ...x, tts_content: updated.tts_content } : x)
+      } : prev);
+      setAiTtsState(s => ({ ...s, [m.id]: { ...getAiTts(m.id), saving: false } }));
+    } catch (err) {
+      const msg = getApiErrorMessage(err, 'Lưu bản dịch thất bại.');
+      setAiTtsState(s => ({ ...s, [m.id]: { ...getAiTts(m.id), saving: false, error: msg } }));
+    }
+  };
+
   const handleSave = async () => {
     if (saveInFlightRef.current) return;
     saveInFlightRef.current = true;
@@ -461,7 +481,7 @@ export default function PartnerPOI() {
   };;
 
   const getAiTts = (mediaId: string) =>
-    aiTtsState[mediaId] ?? { voice: 'Aoede', loading: false, error: '' };
+    aiTtsState[mediaId] ?? { voice: 'Aoede', loading: false, error: '', ttsContent: undefined, saving: false };
 
   const generateAiTts = async (m: Media) => {
     if (!poi?.id) return;
@@ -474,11 +494,13 @@ export default function PartnerPOI() {
     const cur = getAiTts(m.id);
     if (cur.loading) return;
     const chosenVoice = cur.voice || 'Aoede';
+    const text = cur.ttsContent !== undefined ? cur.ttsContent : (m.tts_content || formData.description || '');
+
     setAiTtsState((s) => ({ ...s, [m.id]: { ...cur, loading: true, error: '' } }));
     try {
       const { data } = await apiClient.post<{ file_url: string; voice: string; media: Media }>(
         `/pois/${poi.id}/media/${m.id}/generate-tts/`,
-        { voice: chosenVoice },
+        { voice: chosenVoice, tts_content: text },
       );
       // Cập nhật POI media list inline
       setPoi((prev) =>
@@ -766,19 +788,37 @@ export default function PartnerPOI() {
                           </span>
                           <span className="text-slate-500">{voiceRegionLabel(m.voice_region)}</span>
                         </div>
-                        {m.media_type === 'TTS' && (m.tts_content || '').trim() ? (
-                          <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-slate-600">
-                            {m.tts_content}
-                          </p>
-                        ) : m.media_type === 'AUDIO' ? (
-                          <p className="mt-1 truncate text-xs text-slate-500" title={m.file_url}>
-                            {m.file_url ? 'File âm thanh đã tải lên' : 'Chưa có file'}
-                          </p>
-                        ) : (
-                          <p className="mt-1 text-xs text-slate-500 italic">
-                            Dùng mô tả POI nếu chưa có văn bản TTS riêng.
-                          </p>
-                        )}
+                        
+                        <div className="mt-2">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Đoạn giới thiệu đã dịch</label>
+                          <textarea
+                            value={getAiTts(m.id).ttsContent ?? m.tts_content ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAiTtsState(s => ({ ...s, [m.id]: { ...getAiTts(m.id), ttsContent: val } }));
+                            }}
+                            placeholder="Nhập đoạn giới thiệu đã dịch ở đây..."
+                            rows={3}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-700 outline-none focus:border-primary transition"
+                          />
+                          <div className="mt-1 flex justify-between items-center">
+                             {m.media_type === 'AUDIO' && m.file_url && (
+                               <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-0.5">
+                                 <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                                 Đã có file âm thanh
+                               </span>
+                             )}
+                             {(getAiTts(m.id).ttsContent !== undefined && getAiTts(m.id).ttsContent !== m.tts_content) && (
+                               <button 
+                                 onClick={() => void handleSaveTtsContent(m)}
+                                 disabled={getAiTts(m.id).saving}
+                                 className="ml-auto text-[10px] font-bold text-primary hover:underline disabled:opacity-50"
+                               >
+                                 {getAiTts(m.id).saving ? 'Đang lưu...' : 'Lưu bản dịch'}
+                               </button>
+                             )}
+                          </div>
+                        </div>
                       </div>
                       <button
                         type="button"

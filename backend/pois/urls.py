@@ -13,6 +13,7 @@ urlpatterns = [
     path('scan/', views.POIScanView.as_view(), name='scan'),
     path('<int:pk>/', views.POIDetailView.as_view(), name='detail'),
     path('<int:poi_id>/media/', views.POIMediaView.as_view(), name='media'),
+    path('<int:poi_id>/media/<int:pk>/', views.MediaDetailView.as_view(), name='media-detail'),
     path('<int:poi_id>/media/<int:media_id>/generate-tts/', views.MediaGenerateTTSView.as_view(), name='media-generate-tts'),
     path('<int:poi_id>/translate-all/', views.AITranslateAllView.as_view(), name='translate-all'),
     path('<int:poi_id>/partners/', views.POIPartnersView.as_view(), name='poi-partners'),
