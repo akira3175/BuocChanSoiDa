@@ -1,0 +1,44 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "Partner\n(Chủ quán ăn)" as Partner
+participant "Partner Portal\n(Frontend)" as App
+participant "POI API\n(/api/pois/)" as API
+participant "Gemini AI\n(Google)" as AI
+database "Database" as DB
+
+== Dịch tự động bằng AI (Translate) ==
+Partner -> App: Nhập nội dung tiếng Việt & Bấm "Dịch AI"
+App -> API: `POST /api/pois/{poiId}/ai-translate/`
+API -> DB: Kiểm tra `ai_translate_quota` > 0
+DB --> API: Đủ lượt (Hợp lệ)
+API -> AI: Gửi yêu cầu dịch thuật văn bản (Prompt Tiếng Anh, etc.)
+AI --> API: Văn bản đã dịch
+API -> DB: Trừ 1 lượt `ai_translate_quota`
+API --> App: 200 OK (Bản dịch, remaining_quota)
+App --> Partner: Hiển thị văn bản dịch (Cho phép chỉnh sửa)
+
+== Tạo Thuyết minh bằng AI (Text-to-Speech) ==
+Partner -> App: Bấm "Tạo Audio AI"
+App -> API: `updatePOIMedia()`\nPATCH /api/pois/{poiId}/media/{mediaId}/\n(Kèm tham số yêu cầu sinh TTS AI)
+API -> DB: Kiểm tra `ai_tts_quota` > 0
+DB --> API: Đủ lượt
+API -> AI: Gửi yêu cầu sinh giọng nói (Gemini TTS / OS TTS)
+AI --> API: File Audio (MP3)
+API -> DB: Trừ 1 lượt `ai_tts_quota` & Lưu đường dẫn Audio
+API --> App: 200 OK (Media Object đã cập nhật)
+App --> Partner: Cập nhật Audio Player
+
+== Nạp thêm lượt AI (Quota Top-up) ==
+Partner -> App: Lượt AI = 0, Bấm "Nạp thêm lượt"
+App -> API: `POST /api/payments/ai-quota/` (Hoặc endpoint tương đương)
+API -> DB: Tạo Invoice mua gói lượt AI (PENDING)
+API --> App: 201 Created (invoice_id)
+App -> App: Tích hợp PayPal thanh toán (Re-use Luồng PayPal)
+App -> API: Capture Payment
+API -> DB: Cộng thêm số lượt (quota) tương ứng vào tài khoản Partner
+API --> App: 200 OK
+App --> Partner: Cập nhật số dư lượt AI
+
+@enduml

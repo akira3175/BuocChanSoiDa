@@ -1,0 +1,42 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "Partner\n(Chủ quán ăn)" as Partner
+participant "Frontend / App" as App
+participant "Account API\n(/api/partners/account/)" as AccountAPI
+database "Database" as DB
+
+== 1. Đăng ký & Đăng nhập tài khoản ==
+Partner -> App: Nhập thông tin đăng ký\n(email, username, password...)
+App -> AccountAPI: `signupPartner()`\nPOST /api/partners/account/register/
+AccountAPI -> DB: Tạo User & Gán group 'Partner'
+DB --> AccountAPI: Success
+AccountAPI --> App: 201 Created (Trả về access & refresh token)
+
+Partner -> App: Đăng nhập (nếu token hết hạn)
+App -> AccountAPI: `loginPartner(email, password)`\nPOST /api/partners/account/login/
+AccountAPI -> DB: Xác thực thông tin
+DB --> AccountAPI: Hợp lệ
+AccountAPI --> App: 200 OK (access_token, refresh_token)
+App -> App: Lưu token vào LocalStorage
+
+== 2. Quản lý Hồ sơ Cá nhân (Profile) ==
+Partner -> App: Sửa thông tin cá nhân (VD: đổi preferred_language)
+App -> AccountAPI: `upsertPartnerAccountProfile()`\nPUT /api/partners/account/profile/\nHeader: Bearer <access_token>
+note right of App
+Body: { "preferred_language": "vi", "first_name": "Nguyen" }
+end note
+AccountAPI -> DB: Cập nhật thông tin user
+DB --> AccountAPI: Success
+AccountAPI --> App: 200 OK (Thông tin profile mới)
+
+== 3. Đăng xuất ==
+Partner -> App: Bấm Đăng xuất
+App -> AccountAPI: `logoutPartner()`\nPOST /api/partners/account/logout/\n(refresh: "<token>")
+AccountAPI -> DB: Đưa refresh token vào Blacklist
+DB --> AccountAPI: 
+AccountAPI --> App: 200 OK
+App -> App: Xóa token khỏi LocalStorage
+
+@enduml

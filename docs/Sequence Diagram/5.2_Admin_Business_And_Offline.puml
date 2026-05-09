@@ -1,0 +1,36 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "Admin" as Admin
+participant "Admin Portal\n(Frontend CMS)" as App
+participant "Backend API\n(Django REST)" as API
+database "Cơ sở dữ liệu\n(MySQL)" as DB
+
+== Tạo Cơ sở Kinh doanh Đối tác (Partner Business) ==
+Admin -> App: Nhập thông tin Quán ăn liên kết với POI
+note right of App
+Body gửi lên gồm:
+- poi: 1
+- business_name: "Phở Thìn Lò Đúc"
+- menu_details: {"must_try": ["phở tái", "quẩy"], "price_range": "50k-80k"}
+- opening_hours: "06:00 - 20:30"
+- status: 1
+end note
+App -> API: `POST /api/partners/`\n(Header: Bearer <admin_token>)
+API -> DB: Validate khóa ngoại poi_id = 1
+DB --> API: Hợp lệ
+API -> DB: INSERT INTO partners (...)
+DB --> API: Trả về partner_id
+API --> App: 201 Created
+App --> Admin: Hiển thị danh sách Partner đã được cập nhật
+
+== Cấu hình Luồng Offline (Background) ==
+Admin -> App: Bấm "Cập nhật Gói Offline cho Khu vực"
+App -> API: `POST /api/system/offline-pack/generate`
+API -> DB: Lấy toàn bộ POI, Media, Partner theo khu vực/Tour
+DB --> API: 
+API -> API: Đóng gói thành file SQLite (data.db) & Zip thư mục /media
+API --> App: Trả về link tải / trạng thái hoàn tất
+
+@enduml

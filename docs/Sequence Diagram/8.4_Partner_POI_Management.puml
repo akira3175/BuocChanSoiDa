@@ -1,0 +1,61 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "Partner\n(Premium)" as Partner
+participant "Partner Portal\n(Frontend)" as App
+participant "POI API\n(/api/pois/)" as API
+participant "Google Translate\n& Google TTS" as GoogleAI
+database "Database" as DB
+
+== Thêm mới Điểm Tham Quan (POI) ==
+Partner -> App: Nhập thông tin POI mới (Tên, Tọa độ, Mô tả)
+App -> App: Kiểm tra trạng thái Premium
+App -> API: `POST /api/pois/my-poi/`
+API -> DB: Xác thực quyền Premium của Partner
+DB --> API: Hợp lệ
+API -> API: Sinh mã `qr_code_data` tự động
+API -> DB: Lưu bản ghi POI (Gắn owner=request.user)
+API -> DB: Cập nhật `poi_id` cho Partner hiện tại
+
+API -> GoogleAI: Gửi nội dung Mô tả tiếng Việt
+GoogleAI --> API: Trả về bản dịch các ngôn ngữ (EN, JA, KO,...)
+API -> GoogleAI: Gửi bản dịch để sinh Audio TTS
+GoogleAI --> API: Trả về file âm thanh (MP3)
+API -> DB: Tự động lưu bản dịch & Audio vào bảng Media
+
+DB --> API: 
+API --> App: 201 Created (Chi tiết POI vừa tạo)
+App --> Partner: Hiển thị POI trên bản đồ của quán
+
+== Cập nhật thông tin POI (Sửa POI) ==
+Partner -> App: Sửa thông tin (Đổi tên, Mô tả, Tọa độ)
+App -> API: `PUT/PATCH /api/pois/my-poi/`
+API -> DB: Kiểm tra quyền sở hữu POI (owner=request.user)
+DB --> API: Xác nhận sở hữu
+API -> DB: Kiểm tra trùng lặp tọa độ (Geofence radius)
+DB --> API: Hợp lệ
+API -> DB: Cập nhật thông tin POI
+
+API -> GoogleAI: Gửi nội dung Mô tả mới cập nhật
+GoogleAI --> API: Trả về bản dịch tự động mới
+API -> GoogleAI: Sinh lại Audio TTS tương ứng
+GoogleAI --> API: Trả về file âm thanh mới (MP3)
+API -> DB: Cập nhật lại bản dịch & Audio trong bảng Media
+
+DB --> API: 
+API --> App: 200 OK
+App --> Partner: Báo lưu thành công
+
+== Xóa Điểm Tham Quan (Xóa POI) ==
+Partner -> App: Bấm nút "Xóa POI"
+App -> App: Hiển thị hộp thoại Xác nhận
+Partner -> App: Đồng ý
+App -> API: `DELETE /api/pois/my-poi/`
+API -> DB: Xóa bản ghi POI & Media liên quan
+API -> DB: Xóa liên kết `poi_id` của Partner
+DB --> API: 
+API --> App: 204 No Content
+App --> Partner: Xóa khỏi danh sách quản lý
+
+@enduml

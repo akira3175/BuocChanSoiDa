@@ -1,0 +1,36 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "User" as User
+participant "Frontend / App" as App
+participant "Users API\n(/api/users/)" as UserAPI
+database "Database" as DB
+
+== Đăng ký tài khoản ==
+User -> App: Nhập thông tin đăng ký (Email, Password)
+App -> UserAPI: `signupUserAccount(payload)`\nPOST /api/users/register/
+UserAPI -> DB: Kiểm tra Email tồn tại & Tạo User
+DB --> UserAPI: Hợp lệ
+UserAPI --> App: 201 Created (Trả về access_token, refresh_token)
+App -> App: `setUserAuthSession(session)`\nLưu vào LocalStorage
+
+== Đăng nhập tài khoản ==
+User -> App: Nhập Email, Password
+App -> UserAPI: `loginUserAccount(payload)`\nPOST /api/users/login/
+UserAPI -> DB: Xác thực thông tin
+DB --> UserAPI: Hợp lệ
+UserAPI --> App: 200 OK (access_token, refresh_token)
+App -> App: `setUserAuthSession(session)`
+
+== Nâng cấp Tài khoản (Từ Guest lên User) ==
+User -> App: Đang dùng Guest, bấm "Liên kết tài khoản"
+App -> UserAPI: `upgradeGuest(device_id, email, password)`\nPOST /api/users/upgrade-guest/
+UserAPI -> DB: Tìm tài khoản Guest bằng device_id
+DB --> UserAPI: Tìm thấy
+UserAPI -> DB: Cập nhật Email, Password
+DB --> UserAPI: Thành công
+UserAPI --> App: 200 OK (Token mới của tài khoản chính thức)
+App -> App: Ghi đè Token cũ trong LocalStorage
+
+@enduml

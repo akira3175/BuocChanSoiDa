@@ -178,5 +178,26 @@
         "anonymous": "관광객",
         "errorNoRating": "별점을 선택해 주세요.",
         "errorSubmit": "오류가 발생했습니다. 다시 시도해 주세요."
+    },
+    "movementLog": {
+        "title": "이동 기록",
+        "language": "언어",
+        "gpsPoints": "GPS 포인트",
+        "distance": "거리",
+        "duration": "소요 시간",
+        "mapTitle": "여정 지도",
+        "hide": "숨기기",
+        "show": "표시",
+        "all": "전체",
+        "today": "오늘",
+        "yesterday": "어제",
+        "points": "포인트",
+        "startPoint": "시작 지점",
+        "endPoint": "종료 지점",
+        "loginRequired": "로그인해 주세요",
+        "loginDesc": "이동 기록을 보려면 로그인이 필요합니다.",
+        "emptyTitle": "이동 기록이 없습니다",
+        "emptyDesc": "투어를 시작하고 이동하면 시스템이 자동으로 기록합니다.",
+        "loadError": "이동 기록을 불러올 수 없습니다. 나중에 다시 시도해 주세요."
     }
 }

@@ -1,0 +1,53 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "User" as User
+participant "Mobile App\n(Frontend)" as App
+participant "Tours API" as ToursAPI
+participant "Payments API" as PaymentAPI
+participant "PayPal API" as PayPal
+database "Database" as DB
+
+== Đánh giá Lộ trình (Review) ==
+User -> App: Kéo xuống phần Đánh giá
+App -> ToursAPI: `getTourReviews(tourId=1)`\nGET /api/tours/reviews/?tour_id=1
+ToursAPI --> App: 200 OK (List<Review>)
+
+User -> App: Nhập đánh giá (5 sao, bình luận)
+App -> ToursAPI: `submitTourReview(review)`\nPOST /api/tours/reviews/\n{"tour": 1, "rating": 5, "comment": "Tuyệt!"}
+ToursAPI -> DB: Lưu đánh giá mới
+DB --> ToursAPI: 
+ToursAPI --> App: 201 Created (Review Object)
+App --> User: Hiển thị đánh giá vừa đăng
+
+== Kiểm tra & Mua Tour Premium ==
+User -> App: Vào màn hình Chi tiết Tour Premium
+App -> PaymentAPI: `checkTourPurchase(tourId=1)`\nGET /api/payments/tour-purchase/check/?tour_id=1
+PaymentAPI -> DB: Kiểm tra User đã mua Tour này chưa (Status=SUCCESS)
+DB --> PaymentAPI: Trả về trạng thái (VD: purchased: false)
+PaymentAPI --> App: 200 OK (purchased: false)
+App --> User: Hiển thị nút "Mua Tour Premium"
+
+User -> App: Bấm nút "Mua Tour Premium"
+App -> PaymentAPI: `purchasePremiumTour(tourId=1)`\nPOST /api/payments/tour-purchase/\n{"tour_id": 1}
+PaymentAPI -> DB: Tạo Invoice mới & Bản ghi TourPurchase (PENDING)
+DB --> PaymentAPI: Trả về invoice_id
+PaymentAPI --> App: 201 Created (invoice_id, amount)
+App --> User: Chuyển hướng sang màn hình Thanh Toán
+
+== Tích hợp PayPal (Re-use) ==
+App -> PaymentAPI: `paypalCreateOrder(invoice_id)`\nPOST /api/payments/paypal/create-order/
+PaymentAPI -> PayPal: Tạo Order
+PayPal --> PaymentAPI: Order ID
+PaymentAPI --> App: Trả về Order ID
+App --> User: Hiển thị Widget PayPal
+User -> App: Phê duyệt thanh toán (Approve)
+App -> PaymentAPI: `paypalCaptureOrder(order_id, invoice_id)`\nPOST /api/payments/paypal/capture-order/{order_id}/
+PaymentAPI -> PayPal: Capture Payment
+PayPal --> PaymentAPI: COMPLETED
+PaymentAPI -> DB: Cập nhật Invoice & TourPurchase (SUCCESS)
+PaymentAPI --> App: Trả về kết quả
+App --> User: Thông báo "Mua Tour Thành công"
+
+@enduml

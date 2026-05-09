@@ -1,0 +1,34 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "Partner\n(Chủ quán ăn)" as Partner
+participant "Partner Portal\n(Frontend)" as App
+participant "Partner API\n(/api/partners/)" as API
+database "Database" as DB
+
+== Mua Gói Partner Premium (Để tạo POI) ==
+Partner -> App: Đăng ký dịch vụ Premium
+App -> API: `checkPartnerPremiumPurchase()`\nGET /api/payments/partner-premium/check/
+API --> App: 200 OK (purchased: false)
+App -> API: `purchasePartnerPremium()`\nPOST /api/payments/partner-premium/
+API -> DB: Sinh hóa đơn thanh toán cho Partner (PENDING)
+API --> App: 201 Created (invoice_id)
+App -> App: Chuyển hướng thanh toán qua PayPal (Re-use Luồng PayPal)
+App -> API: Capture Payment
+API -> DB: Cập nhật trạng thái Partner thành Premium User
+API --> App: 200 OK
+App --> Partner: Cập nhật huy hiệu Premium
+
+== Hủy/Vô hiệu hóa Tài khoản (Deactivate) ==
+Partner -> App: Vào Cài đặt -> Bấm "Hủy tài khoản"
+App -> App: Hiển thị cảnh báo xác nhận
+Partner -> App: Đồng ý
+App -> API: `deactivatePartnerAccount()`\nPOST /api/partners/account/deactivate/
+API -> DB: Thay đổi trạng thái Partner thành Inactive\n(Ẩn thông tin khỏi hệ thống, giữ lại lịch sử)
+DB --> API: 
+API --> App: 200 OK (Thành công)
+App -> App: `setPartnerAuthSession(null)`\nXóa token và tự động đăng xuất
+App --> Partner: Chuyển hướng về trang chủ
+
+@enduml

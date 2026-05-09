@@ -1,0 +1,43 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "Người Dùng" as User
+participant "Mobile App\n(Narration Engine)" as App
+participant "Local DB / API" as API
+participant "OS TTS Engine\n(iOS/Android)" as TTS
+
+User -> App: Kích hoạt nghe\n(Vào Geofence / Quét QR)
+App -> API: `getPOIMedia(poiId, lang, region)`\nLấy dữ liệu POI & danh sách Media
+API --> App: Trả về POI chi tiết (Kèm nội dung 'description') & Media List
+
+== Lựa chọn nội dung (Media Match Logic) ==
+
+App -> App: `selectBestMedia()`\nKiểm tra ngôn ngữ máy (VD: 'vi')\nTìm file Audio (MP3) ngôn ngữ 'vi'
+
+alt Có file MP3 hợp lệ
+    App -> App: Phát file MP3 bình thường (Bỏ qua TTS)
+else Không có file MP3 (Kích hoạt Fallback TTS)
+    App -> App: Trích xuất trường văn bản `POI.description`
+    App -> App: Chuẩn hóa văn bản (Lọc bỏ ký tự đặc biệt, HTML)
+    App -> TTS: Gửi yêu cầu tổng hợp giọng nói\n`window.speechSynthesis.speak()`\n(Text: description, Lang: 'vi')
+    TTS -> TTS: Tiến hành xử lý Text-to-Speech ngầm
+    TTS --> App: Bắt đầu luồng âm thanh (Audio Stream)
+    App --> User: Phát giọng đọc máy tính qua loa
+end
+
+App -> API: `startNarration()`\nPOST /api/analytics/narration/start/\n(Ghi log đang nghe)
+
+== Đọc thông tin đối tác (Tùy chọn hiển thị) ==
+
+App -> API: `getPOIPartners(poiId)`\nLấy danh sách Partner liên kết POI
+API --> App: Trả về JSON (business_name, menu_details)
+App -> App: Trích xuất thông tin món ăn (must_try)
+App -> TTS: Gửi yêu cầu TTS đọc thông tin Partner
+TTS --> App: Phát nối tiếp đoạn âm thanh giới thiệu quán
+
+User -> App: Bấm Pause / Rời khỏi vùng
+App -> TTS: Gửi lệnh Dừng (Stop / Flush)
+App -> API: `endNarration(logId, duration)`\nPATCH /api/analytics/narration/{id}/end/\n(Lưu thời lượng)
+
+@enduml

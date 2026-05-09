@@ -185,5 +185,26 @@
     "anonymous": "Khách du lịch",
     "errorNoRating": "Vui lòng chọn số sao đánh giá.",
     "errorSubmit": "Có lỗi xảy ra, vui lòng thử lại."
+  },
+  "movementLog": {
+    "title": "Lịch sử di chuyển",
+    "language": "Ngôn ngữ",
+    "gpsPoints": "Điểm GPS",
+    "distance": "Quãng đường",
+    "duration": "Thời gian",
+    "mapTitle": "Bản đồ hành trình",
+    "hide": "Ẩn",
+    "show": "Hiện",
+    "all": "Tất cả",
+    "today": "Hôm nay",
+    "yesterday": "Hôm qua",
+    "points": "điểm",
+    "startPoint": "Điểm bắt đầu",
+    "endPoint": "Điểm kết thúc",
+    "loginRequired": "Vui lòng đăng nhập",
+    "loginDesc": "Bạn cần đăng nhập để xem lịch sử di chuyển của mình.",
+    "emptyTitle": "Chưa có lịch sử di chuyển",
+    "emptyDesc": "Bắt đầu một tour và di chuyển để hệ thống tự động ghi lại hành trình của bạn.",
+    "loadError": "Không thể tải lịch sử di chuyển. Vui lòng thử lại sau."
   }
 }

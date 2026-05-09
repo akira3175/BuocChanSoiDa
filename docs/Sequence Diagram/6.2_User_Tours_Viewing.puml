@@ -1,0 +1,37 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "User" as User
+participant "Mobile App\n(Frontend)" as App
+participant "Tours API\n(/api/tours/)" as API
+database "Database" as DB
+
+== Xem danh sách Lộ trình (Tours) ==
+User -> App: Chọn tab "Lộ trình"
+App -> API: `getTours()`\nGET /api/tours/
+API -> DB: Lấy danh sách Tours (kèm thông tin giá, POI liên quan)
+DB --> API: Dữ liệu Tours
+API --> App: 200 OK (List<Tour>)
+App --> User: Hiển thị danh sách Lộ trình
+
+== Xem chi tiết Lộ trình ==
+User -> App: Bấm chọn 1 Lộ trình (VD: Tour 1)
+App -> API: `getTourById(id=1)`\nGET /api/tours/1/
+API -> DB: Lấy chi tiết Tour (pois, duration, premium_price)
+DB --> API: 
+API --> App: 200 OK (Tour Detail)
+App -> API: `getTourPOIGroups([1])`\nGET /api/tours/tour-pois/?tour_ids=1
+API --> App: 200 OK (Phân nhóm POI theo khoảng cách)
+App --> User: Hiển thị Chi tiết Lộ trình & Bản đồ lộ trình
+
+== Tải Gói Offline (Offline Package) ==
+User -> App: Bấm "Tải về nghe Offline"
+App -> API: `downloadOfflinePackage(tourId=1)`\nGET /api/offline/package/1/
+API -> DB: Lấy file SQLite & Media nén sẵn
+DB --> API: 
+API --> App: 200 OK (Blob ZIP/DB)
+App -> App: Giải nén & Lưu vào IndexedDB/File System
+App --> User: Thông báo "Tải thành công"
+
+@enduml

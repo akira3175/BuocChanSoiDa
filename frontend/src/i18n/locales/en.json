@@ -185,5 +185,26 @@
         "anonymous": "Tourist",
         "errorNoRating": "Please select a star rating.",
         "errorSubmit": "An error occurred, please try again."
+    },
+    "movementLog": {
+        "title": "Movement History",
+        "language": "Language",
+        "gpsPoints": "GPS Points",
+        "distance": "Distance",
+        "duration": "Duration",
+        "mapTitle": "Journey Map",
+        "hide": "Hide",
+        "show": "Show",
+        "all": "All",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "points": "points",
+        "startPoint": "Start point",
+        "endPoint": "End point",
+        "loginRequired": "Please log in",
+        "loginDesc": "You need to log in to view your movement history.",
+        "emptyTitle": "No movement history yet",
+        "emptyDesc": "Start a tour and move around for the system to automatically record your journey.",
+        "loadError": "Could not load movement history. Please try again later."
     }
 }

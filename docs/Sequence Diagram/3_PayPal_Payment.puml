@@ -1,0 +1,41 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "User" as User
+participant "Frontend (React)" as App
+participant "Backend (Django)" as API
+participant "PayPal API" as PayPal
+database "Database" as DB
+
+User -> App: Xem chi tiết hóa đơn
+App -> API: `getInvoiceById(id)`\nGET /api/payments/invoices/{id}/
+API -> DB: Lấy thông tin hóa đơn
+DB --> API: Trả về dữ liệu hóa đơn
+API --> App: JSON hóa đơn
+App --> User: Hiển thị thông tin thanh toán
+
+User -> App: Nhấn nút PayPal
+App -> API: `paypalCreateOrder(invoiceId)`\nPOST /api/payments/paypal/create-order/
+API -> API: Tạo payload với invoice info
+API -> PayPal: POST /v2/checkout/orders
+PayPal --> API: Order ID + Approval URL
+API -> DB: Cập nhật transaction_code
+API --> App: {id: "order_id"}
+App --> User: Render PayPal buttons
+
+User -> App: Approve payment (Thực hiện thanh toán)
+App -> App: `onApprove` callback
+App -> API: `paypalCaptureOrder(orderId, invoiceId)`\nPOST /api/payments/paypal/capture-order/{order_id}/
+API -> PayPal: POST /v2/checkout/orders/{order_id}/capture
+PayPal --> API: {status: "COMPLETED"}
+API -> DB: Cập nhật status = SUCCESS, paid_at
+API --> App: Capture result
+
+App -> API: `getInvoiceById(id)`\nGET /api/payments/invoices/{id}/
+API -> DB: Lấy hóa đơn đã cập nhật
+DB --> API: Trả về hóa đơn status SUCCESS
+API --> App: Hóa đơn mới (Cập nhật UI)
+App --> User: Hiển thị thanh toán thành công
+
+@enduml

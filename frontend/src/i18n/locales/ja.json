@@ -179,5 +179,26 @@
         "anonymous": "観光客",
         "errorNoRating": "星の評価を選択してください。",
         "errorSubmit": "エラーが発生しました。もう一度お試しください。"
+    },
+    "movementLog": {
+        "title": "移動履歴",
+        "language": "言語",
+        "gpsPoints": "GPSポイント",
+        "distance": "距離",
+        "duration": "所要時間",
+        "mapTitle": "ルートマップ",
+        "hide": "非表示",
+        "show": "表示",
+        "all": "すべて",
+        "today": "今日",
+        "yesterday": "昨日",
+        "points": "ポイント",
+        "startPoint": "スタート地点",
+        "endPoint": "終点",
+        "loginRequired": "ログインしてください",
+        "loginDesc": "移動履歴を確認するにはログインが必要です。",
+        "emptyTitle": "移動履歴はまだありません",
+        "emptyDesc": "ツアーを始めて移動すると、システムが自動的に履歴を記録します。",
+        "loadError": "移動履歴を読み込めませんでした。しばらくしてから再度お試しください。"
     }
 }

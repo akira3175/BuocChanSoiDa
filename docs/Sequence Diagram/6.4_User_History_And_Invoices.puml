@@ -1,0 +1,27 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "User" as User
+participant "Frontend / App" as App
+participant "Analytics API\n(/api/analytics/)" as AnalyticsAPI
+participant "Payments API\n(/api/payments/)" as PaymentsAPI
+database "Database" as DB
+
+== Xem Lịch sử Di chuyển (Heatmap/Đường đi) ==
+User -> App: Chọn tab "Bản đồ nhiệt" (Heatmap)
+App -> AnalyticsAPI: `getBreadcrumbHistory(limit=2000)`\nGET /api/analytics/breadcrumbs/history/
+AnalyticsAPI -> DB: Truy xuất danh sách Breadcrumb của User
+DB --> AnalyticsAPI: 
+AnalyticsAPI --> App: 200 OK (List<BreadcrumbPoint>)
+App --> User: Render các điểm tọa độ lên bản đồ (Leaflet Heatmap)
+
+== Xem Danh sách Hóa đơn ==
+User -> App: Vào Cài đặt -> Hóa đơn
+App -> PaymentsAPI: `getInvoices(statusFilter)`\nGET /api/payments/invoices/
+PaymentsAPI -> DB: Lấy danh sách Invoice của User
+DB --> PaymentsAPI: 
+PaymentsAPI --> App: 200 OK (List<Invoice>)
+App --> User: Hiển thị danh sách hóa đơn theo trạng thái (Tất cả, Thành công, Đã hủy)
+
+@enduml

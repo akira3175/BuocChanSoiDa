@@ -1,0 +1,38 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "Partner\n(Chủ quán ăn)" as Partner
+participant "Partner Portal\n(Frontend)" as App
+participant "Partner API\n(/api/partners/)" as API
+participant "Cloudinary\n(Storage)" as Cloud
+database "Database" as DB
+
+== Xem Thống kê (Analytics) ==
+Partner -> App: Truy cập Bảng điều khiển (Dashboard)
+App -> API: `getPartnerAnalytics()`\nGET /api/partners/account/analytics/
+API -> DB: Thống kê lượt nghe, lượt quét QR, lượt xem
+DB --> API: 
+API --> App: 200 OK (PartnerAnalyticsData)
+App --> Partner: Hiển thị Biểu đồ và Số liệu
+
+== Lấy mã QR liên kết Bản đồ (Map QR) ==
+Partner -> App: Bấm "Tải mã QR dán biển"
+App -> API: `getPartnerMapQrUrl()`\nGET /api/pois/my-poi/qr-map-url/
+API -> DB: Lấy ID của POI liên kết
+API -> API: Ký số payload (Sinh QR Token)
+API --> App: 200 OK (map_path, expires_in_seconds)
+App -> App: Render hình ảnh Mã QR chứa Link (/map?poi=...&qr=...)
+App --> Partner: Cho phép tải ảnh QR
+
+== Tải Ảnh bìa cho POI (Cover Image) ==
+Partner -> App: Chọn ảnh tải lên (JPG/PNG)
+App -> API: `uploadPOICoverImage(file)`\nPOST /api/pois/my-poi/cover-image/
+API -> Cloud: Upload ảnh lên Cloudinary
+Cloud --> API: Trả về URL ảnh (secure_url)
+API -> DB: Lưu URL vào trường cover_image_url
+DB --> API: 
+API --> App: 200 OK (cover_image_url)
+App --> Partner: Cập nhật hiển thị ảnh bìa
+
+@enduml

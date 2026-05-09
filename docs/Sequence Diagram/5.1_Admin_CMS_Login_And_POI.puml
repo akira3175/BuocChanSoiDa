@@ -1,0 +1,35 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "Admin" as Admin
+participant "Admin Portal\n(Frontend CMS)" as App
+participant "Backend API\n(Django REST)" as API
+participant "Google Translate\n& Google TTS" as GoogleAI
+database "Cơ sở dữ liệu\n(MySQL)" as DB
+
+== Đăng nhập CMS ==
+Admin -> App: Nhập Email & Password
+App -> API: `POST /api/users/login/`
+API -> DB: Xác thực thông tin & Check Group Admin
+DB --> API: Hợp lệ
+API --> App: 200 OK (Trả về access_token & refresh_token)
+App -> App: Lưu token vào LocalStorage
+
+== Tạo Điểm Tham Quan (POI) ==
+Admin -> App: Nhập thông tin POI (Tên, Mô tả, Lat, Long, Radius)
+App -> API: `POST /api/pois/`\n(Header: Bearer <admin_token>)
+API -> API: Xử lý logic Geofence\nTự động sinh `qr_code_data` (VD: BCSD-POI-002)
+API -> DB: Lưu bản ghi POI mới
+
+API -> GoogleAI: Gửi nội dung Mô tả tiếng Việt
+GoogleAI --> API: Trả về bản dịch các ngôn ngữ (EN, JA, KO,...)
+API -> GoogleAI: Gửi bản dịch để sinh Audio TTS
+GoogleAI --> API: Trả về file âm thanh (MP3)
+API -> DB: Tự động lưu bản dịch & Audio vào bảng Media
+
+DB --> API: Trả về ID của POI vừa tạo (VD: poi_id = 1)
+API --> App: 201 Created (Kèm thông tin chi tiết POI)
+App --> Admin: Thông báo "Tạo POI thành công"
+
+@enduml

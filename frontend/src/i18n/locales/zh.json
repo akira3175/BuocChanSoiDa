@@ -178,5 +178,26 @@
         "anonymous": "游客",
         "errorNoRating": "请选择星级评分。",
         "errorSubmit": "发生错误，请重试。"
+    },
+    "movementLog": {
+        "title": "移动记录",
+        "language": "语言",
+        "gpsPoints": "GPS 点位",
+        "distance": "路程",
+        "duration": "时长",
+        "mapTitle": "行程地图",
+        "hide": "隐藏",
+        "show": "显示",
+        "all": "全部",
+        "today": "今天",
+        "yesterday": "昨天",
+        "points": "个点",
+        "startPoint": "起点",
+        "endPoint": "终点",
+        "loginRequired": "请登录",
+        "loginDesc": "您需要登录才能查看移动记录。",
+        "emptyTitle": "暂无移动记录",
+        "emptyDesc": "开始一次游览并移动，系统将自动记录您的行程。",
+        "loadError": "无法加载移动记录，请稍后重试。"
     }
 }

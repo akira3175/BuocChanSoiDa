@@ -1,0 +1,34 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "User" as User
+participant "Mobile App\n(Frontend)" as App
+participant "Background\nService" as BG
+participant "User API\n(/api/users/)" as UserAPI
+database "Database" as DB
+
+== 1. Khởi tạo & Cấu hình Cá nhân ==
+User -> App: Mở ứng dụng
+App -> UserAPI: `guestLogin()`\nPOST /api/users/guest-login/
+UserAPI -> DB: Trích xuất thông tin User
+DB --> UserAPI: Hợp lệ
+UserAPI --> App: 200 OK (access_token, preferred_language, voice_region)
+
+User -> App: Vào Cài đặt -> Chọn Tiếng Anh, Giọng Mỹ
+App -> UserAPI: `updateUserProfile()`\nPATCH /api/users/profile/\n{"preferred_language": "en", "preferred_voice_region": "usa"}
+UserAPI -> DB: Cập nhật User
+DB --> UserAPI: Success
+UserAPI --> App: 200 OK (Đã lưu cấu hình)
+
+== 2. Tracking Hành trình (Chạy ngầm) ==
+User -> App: Bắt đầu đi dạo
+App -> BG: Kích hoạt Service lấy GPS định kỳ (`useGeolocation`)
+
+loop Mỗi 15-30 giây (khi có thay đổi tọa độ)
+    BG -> BG: Gom nhóm các điểm tọa độ (Breadcrumbs)
+    BG -> UserAPI: `postBreadcrumbs()`\nPOST /api/analytics/breadcrumbs/batch/
+    UserAPI -> DB: Lưu vết di chuyển phục vụ Heatmap
+end
+
+@enduml

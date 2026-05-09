@@ -1,0 +1,19 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "Partner\n(Chủ quán ăn)" as Partner
+participant "Frontend / App" as App
+participant "Business API\n(/api/partners/)" as BusinessAPI
+database "Database" as DB
+
+== Tra cứu Cơ sở Kinh doanh (Theo POI) ==
+Partner -> App: Xem thông tin quán của mình tại POI số 1
+App -> BusinessAPI: `getPOIPartners(poiId=1)`\nGET /api/pois/1/partners/
+BusinessAPI -> DB: Truy vấn danh sách partners có poi_id = 1
+DB --> BusinessAPI: Trả về records (business_name, menu_details, opening_hours)
+BusinessAPI --> App: 200 OK (JSON List)
+
+App --> Partner: Render giao diện thẻ nhà hàng\nHiển thị thông tin:\n"Tên: Phở Thìn Lò Đúc"\n"Món phải thử: phở tái, quẩy"\n"Giờ mở cửa: 06:00 - 20:30"
+
+@enduml

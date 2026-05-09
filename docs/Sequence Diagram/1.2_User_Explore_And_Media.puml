@@ -1,0 +1,36 @@
+@startuml
+skinparam maxMessageSize 150
+skinparam sequenceMessageAlign center
+
+actor "User" as User
+participant "Mobile App\n(Frontend)" as App
+participant "Core Data API\n(/api/pois/)" as POIAPI
+database "Database" as DB
+
+== 3. Khám phá Chủ động (Quét QR) ==
+User -> App: Bấm nút "Quét QR" trên biển báo
+App -> App: Mở Camera & Giải mã QR\n(VD: BCSD-POI-001)
+App -> POIAPI: `scanQRCode(code="BCSD-POI-001")`\nGET /api/pois/scan/?code=BCSD-POI-001
+POIAPI -> DB: Tìm POI theo mã QR
+DB --> POIAPI: Trả về POI chi tiết
+POIAPI --> App: 200 OK (Bỏ qua Anti-spam, ép buộc phát)
+
+== 4. Lựa chọn Nội dung (Media Selection Engine) ==
+App -> POIAPI: `getPOIMedia(poiId, lang, region)`\nGET /api/pois/{id}/media/
+POIAPI --> App: Trả về danh sách Media của POI
+
+App -> App: `selectBestMedia()`\nThuật toán Match: Tìm file có language=="en" AND voice_region=="usa"
+
+alt Khớp hoàn toàn
+    App -> App: Chọn file audio_en_usa.mp3
+else Không khớp voice_region (Fallback 1)
+    App -> App: Chọn file audio_en_uk.mp3 (Ngôn ngữ khớp)
+else Không có Audio thu sẵn (Fallback 2)
+    App -> App: Dùng OS TTS đọc trường 'description' (Tiếng Anh)
+end
+
+App -> App: Phát âm thanh qua loa/tai nghe
+App -> POIAPI: `startNarration()`\nPOST /api/analytics/narration/start/\n(type: QR)
+App -> User: Hiển thị Bottom Sheet (Nội dung POI & Gợi ý Quán ăn)
+
+@enduml
