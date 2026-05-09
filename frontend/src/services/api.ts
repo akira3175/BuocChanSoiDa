@@ -157,22 +157,32 @@ apiClient.interceptors.request.use((config) => {
 
     // Auth Header Logic
     const url = config.url || '';
-    const isPartnerRoute = 
+    
+    // Các endpoint dành riêng cho Partner
+    const isPartnerSpecific = 
         url.includes('/partners/') || 
         url.includes('/pois/my-poi') || 
-        url.includes('/payments/') ||
         url.includes('/translate-all/') ||
+        url.includes('/payments/partner-premium/') ||
+        url.includes('/payments/ai-tts/') ||
+        url.includes('/payments/ai-translate/') ||
         (url.includes('/media') && config.method?.toLowerCase() !== 'get');
         
-    if (isPartnerRoute) {
+    if (isPartnerSpecific) {
         const session = getPartnerAuthSession();
         if (session?.access) {
             config.headers.Authorization = `Bearer ${session.access}`;
         }
     } else {
-        const session = getUserAuthSession();
-        if (session?.access) {
-            config.headers.Authorization = `Bearer ${session.access}`;
+        const userSession = getUserAuthSession();
+        const partnerSession = getPartnerAuthSession();
+        
+        // Với các endpoint dùng chung (paypal, invoices) hoặc tour-purchase:
+        // Ưu tiên User token nếu có, fallback Partner token nếu User token trống (dành cho Partner đang thanh toán)
+        if (url.includes('/payments/') && !userSession?.access && partnerSession?.access) {
+            config.headers.Authorization = `Bearer ${partnerSession.access}`;
+        } else if (userSession?.access) {
+            config.headers.Authorization = `Bearer ${userSession.access}`;
         }
     }
 

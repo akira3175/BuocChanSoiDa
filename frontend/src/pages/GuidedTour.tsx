@@ -178,7 +178,7 @@ export default function GuidedTour() {
                 .finally(() => setLoading(false));
         }, 600);
         return () => clearTimeout(timer);
-    }, []);
+    }, [user?.id]);
 
     const orderedPOIs = useMemo(() => {
         if (!selectedTour) return [];
