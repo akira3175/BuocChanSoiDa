@@ -63,8 +63,11 @@ export default function Settings() {
 
     const handleUserLogout = () => {
         setUserAuthSession(null);
+        setPartnerAuthSession(null); // Clear partner session too for safety
         dispatch({ type: 'CLEAR_USER' });
-        navigate('/', { replace: true });
+        
+        // Force a full page reload to clear all React state and caches
+        window.location.href = '/';
     };
 
     const handleOpenInvoice = () => {

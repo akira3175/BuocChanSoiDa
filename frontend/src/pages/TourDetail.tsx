@@ -5,12 +5,14 @@ import AppLayout from '../components/AppLayout';
 import type { Tour, Language } from '../types';
 import { getTourById } from '../services/api';
 import { getOfflineTourById } from '../services/offlineStorage';
+import { useApp } from '../context/AppContext';
 import ReviewSection from '../components/ReviewSection';
 
 export default function TourDetail() {
     const { t, i18n } = useTranslation();
     const { tourId = '' } = useParams();
     const navigate = useNavigate();
+    const { user } = useApp();
 
     const [tour, setTour] = useState<Tour | null>(null);
     const [loading, setLoading] = useState(true);
@@ -33,7 +35,7 @@ export default function TourDetail() {
             setTour(null);
             setLoading(false);
         });
-    }, [tourId]);
+    }, [tourId, user?.id]);
 
     const orderedPOIs = useMemo(() => {
         if (!tour) return [];
