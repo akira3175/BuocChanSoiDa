@@ -22,6 +22,8 @@ services:
         value: https://buocchansoida-backend.onrender.com,https://buocchansoida.netlify.app
       - key: PYTHON_VERSION
         value: 3.10.0
+      - key: RENDER_EXTERNAL_HOSTNAME
+        fromContext: island
 
       # Cloudinary Config
       - key: CLOUDINARY_URL
