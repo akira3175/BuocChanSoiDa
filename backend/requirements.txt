@@ -24,4 +24,5 @@ google-genai
 cryptography
 psycopg2-binary
 dj-database-url
-whitenoise
+whitenoise
+gunicorn
