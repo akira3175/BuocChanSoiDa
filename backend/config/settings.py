@@ -196,7 +196,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5174",
     "http://127.0.0.1:5174",
     "https://buocchansoida.netlify.app",
+    "https://buocchansoida-frontend.onrender.com",
 ]
+
 
 # Comma-separated, e.g. http://YOUR_EC2_IP:3000 (Docker frontend mapped port)
 _cors_extra = os.getenv("CORS_EXTRA_ORIGINS", "")
@@ -215,9 +217,11 @@ CORS_ALLOW_CREDENTIALS = True
 # CSRF configuration for production
 CSRF_TRUSTED_ORIGINS = [
     "https://buocchansoida.netlify.app",
+    "https://buocchansoida-frontend.onrender.com",
     "https://*.ngrok-free.app",
     "https://*.ngrok-free.dev",
 ]
+
 
 _csrf_extra = os.getenv("CSRF_TRUSTED_ORIGINS_EXTRA", "")
 if _csrf_extra.strip():
