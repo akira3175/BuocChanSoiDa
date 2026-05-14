@@ -1,0 +1,52 @@
+services:
+  # Backend Service (Django)
+  - type: web
+    name: buocchansoida-backend
+    env: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
+    startCommand: gunicorn config.wsgi:application
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: buocchansoida-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: buocchansoida-backend.onrender.com,localhost,127.0.0.1
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://buocchansoida-backend.onrender.com,https://buocchansoida.netlify.app
+      - key: PYTHON_VERSION
+        value: 3.10.0
+
+      # Cloudinary Config
+      - key: CLOUDINARY_URL
+        sync: false
+
+
+      # PayPal Config
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_SECRET
+        sync: false
+      - key: PAYPAL_BASE
+        value: https://api-m.sandbox.paypal.com
+
+  # Frontend Service (Vite)
+  - type: web
+    name: buocchansoida-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://buocchansoida-backend.onrender.com/api
+
+databases:
+  - name: buocchansoida-db
+    plan: free

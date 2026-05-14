@@ -20,6 +20,7 @@
 ### Documentation
 
 * **Production deployment & Docker-based testing:** [docs/README.md](docs/README.md)
+* **Render Deployment Guide:** [docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md)
 
 ### Resources
 
