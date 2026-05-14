@@ -10,6 +10,9 @@ DEFAULT_LANGS = ['en', 'ja', 'ko', 'zh']
 @receiver(pre_save, sender='tours.Tour')
 def track_tour_changes(sender, instance, **kwargs):
     """Lưu lại tour_name và description cũ để so sánh trong post_save."""
+    if kwargs.get('raw'):
+        return
+
     if instance.pk:
         try:
             from tours.models import Tour
@@ -28,6 +31,9 @@ def handle_tour_translations(sender, instance, created, **kwargs):
     """
     Tự động dịch tên và mô tả tour khi có thay đổi.
     """
+    if kwargs.get('raw'):
+        return
+
     old_name = getattr(instance, '_old_name', None)
     old_desc = getattr(instance, '_old_description', None)
     

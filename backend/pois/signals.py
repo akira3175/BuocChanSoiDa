@@ -79,6 +79,9 @@ def _generate_tts_and_upload(text: str, lang: str, poi_name: str) -> str:
 @receiver(pre_save, sender='pois.POI')
 def track_poi_changes(sender, instance, **kwargs):
     """Lưu lại name và description cũ để so sánh trong post_save."""
+    if kwargs.get('raw'):
+        return
+
     if instance.pk:
         try:
             from pois.models import POI
@@ -101,6 +104,9 @@ def handle_poi_translations(sender, instance, created, **kwargs):
     2. Dịch/Cập nhật tts_content cho tất cả Media TTS của POI này.
     3. Sinh file TTS audio (.mp3) và upload lên Cloudinary.
     """
+    if kwargs.get('raw'):
+        return
+
     if not instance.description:
         return
 
@@ -186,6 +192,9 @@ def handle_poi_translations(sender, instance, created, **kwargs):
 @receiver(pre_save, sender='pois.Media')
 def track_media_changes(sender, instance, **kwargs):
     """Lưu lại tts_content cũ để so sánh trong post_save."""
+    if kwargs.get('raw'):
+        return
+
     if instance.pk:
         try:
             from pois.models import Media
@@ -202,6 +211,9 @@ def handle_manual_media_updates(sender, instance, created, **kwargs):
     1. Nếu Admin để trống tts_content + không phải 'vi' -> Tự dịch.
     2. Nếu tts_content thay đổi (hoặc mới) -> Sinh lại TTS audio.
     """
+    if kwargs.get('raw'):
+        return
+
     if instance.media_type != 'TTS':
         return
 
